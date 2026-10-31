@@ -8,3 +8,11 @@ export type Chat = {
   unreadCount?: number
   online?: boolean
 }
+
+export type ChatMessage = {
+  id: string;
+  chatId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+};
