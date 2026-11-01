@@ -3,6 +3,7 @@ import { ChatList } from './components/ChatList'
 import { Sidebar } from './components/Sidebar'
 import { mockChats } from './data/mockChats'
 import type { Chat } from './types/chat'
+import Login from './components/Login'
 import './App.css'
 import ChatWindow from './components/ChatWindow';
 import { useSelector } from "react-redux";
@@ -12,9 +13,10 @@ function App() {
   const [query, setQuery] = useState('')
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [activeSection, setActiveSection] = useState('Tin nh\u1EAFn')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const currentUserId = "user-001";
-  const messages = useSelector((state: RootState) => state.messages.messages);
+  const messages = useSelector((state: RootState) => state.messages.messages)
+
   const filteredChats = useMemo(() => {
     return mockChats
         .map((chat) => {
@@ -24,7 +26,7 @@ function App() {
                   (a, b) =>
                       new Date(b.createdAt).getTime() -
                       new Date(a.createdAt).getTime()
-              )[0];
+              )[0]
 
           return {
             ...chat,
@@ -41,7 +43,11 @@ function App() {
         .filter((chat) =>
             chat.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
         );
-  }, [query, messages]);
+  }, [query, messages, currentUserId])
+
+    if (!currentUserId) {
+        return <Login onLogin={setCurrentUserId} />
+    }
 
   return <main className="app-shell">
     <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
