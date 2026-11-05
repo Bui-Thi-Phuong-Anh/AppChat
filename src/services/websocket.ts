@@ -1,0 +1,128 @@
+export interface WebSocketMessage<T = unknown> {
+    event: string;
+    data: T;
+}
+
+type MessageCallback = (message: WebSocketMessage) => void;
+type StatusCallback = (status: WebSocketState) => void;
+
+export type WebSocketState = | 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+
+class WebSocketService {
+    private socket: WebSocket | null = null;
+
+    private messageListeners = new Map<string, Set<MessageCallback>>();
+    private statusListeners = new Set<StatusCallback>();
+
+    private readonly url = 'wss://chat.longapp.io.vn/chat/chat';
+
+    connect(): Promise<void> {
+        if (this.socket?.readyState === WebSocket.OPEN) {
+            return Promise.resolve();
+        }
+
+        if (this.socket?.readyState === WebSocket.CONNECTING) {
+            return new Promise((resolve, reject) => {
+                const unsubscribe = this.onStatus((status) => {
+                    if (status === 'CONNECTED') {
+                        unsubscribe();
+                        resolve();
+                    }
+
+                    if (status === 'ERROR' || status === 'DISCONNECTED') {
+                        unsubscribe();
+                        reject(new Error('Không thể kết nối WebSocket'));
+                    }
+                });
+            });
+        }
+
+        return new Promise((resolve, reject) => {
+            const ws = new WebSocket(this.url);
+            this.socket = ws;
+
+            this.notifyStatus('CONNECTING');
+
+            ws.onopen = () => {
+                this.notifyStatus('CONNECTED');
+                resolve();
+            };
+
+            ws.onmessage = (event: MessageEvent<string>) => {
+                try {
+                    const raw = JSON.parse(event.data);
+
+                    const message = raw?.data?.event ? raw.data : raw;
+
+                    if (typeof message.event !== 'string') {
+                        console.warn('WebSocket response không hợp lệ:', raw);
+                        return;
+                    }
+
+                    this.notifyMessage({event: message.event, data: message.data,});
+                } catch (error) {
+                    console.error('Lỗi đọc WebSocket message:', error);
+                }
+            };
+
+            ws.onerror = () => {
+                this.notifyStatus('ERROR');
+                reject(new Error('WebSocket connection error'));
+            };
+
+            ws.onclose = () => {
+                this.notifyStatus('DISCONNECTED');
+                this.socket = null;
+            };
+        });
+    }
+
+    send(event: string, data: unknown = {}): void {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            throw new Error('WebSocket chưa kết nối');
+        }
+
+        const request = {
+            action: 'onchat',
+            data: {
+                event,
+                data,
+            },
+        };
+
+        this.socket.send(JSON.stringify(request));
+    }
+
+    on(event: string, callback: MessageCallback): () => void {
+        if (!this.messageListeners.has(event)) {
+            this.messageListeners.set(event, new Set());
+        }
+
+        this.messageListeners.get(event)!.add(callback);
+
+        return () => {this.messageListeners.get(event)?.delete(callback);};
+    }
+
+    onStatus(callback: StatusCallback): () => void {
+        this.statusListeners.add(callback);
+
+        return () => {this.statusListeners.delete(callback);};
+    }
+
+    private notifyMessage(message: WebSocketMessage): void {
+        this.messageListeners.get(message.event)?.forEach((callback) => {
+            callback(message);
+        });
+    }
+
+    private notifyStatus(status: WebSocketState): void {
+        this.statusListeners.forEach((callback) => callback(status));
+    }
+
+    disconnect(): void {
+        this.socket?.close();
+        this.socket = null;
+    }
+}
+
+export const websocketService = new WebSocketService();
