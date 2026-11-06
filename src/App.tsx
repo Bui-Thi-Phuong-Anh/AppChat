@@ -11,13 +11,14 @@ import type { Chat } from "./types/chat";
 import type { RootState } from "./store/store";
 
 import "./App.css";
+import { Register } from "./components/Register";
 
 function App() {
     const [query, setQuery] = useState("");
     const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
     const [activeSection, setActiveSection] = useState("Tin nhắn");
-
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [showRegister, setShowRegister] = useState(false);
 
     const messages = useSelector(
         (state: RootState) => state.messages.messages
@@ -65,8 +66,12 @@ function App() {
             );
     }, [query, messages, currentUserId]);
 
+    if (!currentUserId && showRegister) {
+        return (<Register onBackToLogin={() => setShowRegister(false)}/>);
+    }
+
     if (!currentUserId) {
-        return <Login onLogin={handleLogin} />;
+        return (<Login onLogin={handleLogin} onRegister={() => setShowRegister(true)}/>);
     }
 
     return (<main className="app-shell">

@@ -2,9 +2,9 @@ import { useState, type FormEvent } from "react";
 import { websocketService } from "../services/websocket";
 
 type LoginResponse = { RE_LOGIN_CODE?: string; mes?: string; message?: string; };
-type LoginProps = { onLogin: (userId: string, reLoginCode: string) => void; };
+type LoginProps = { onLogin: (userId: string, reLoginCode: string) => void; onRegister: () => void; };
 
-export function Login({ onLogin }: LoginProps) {
+export function Login({ onLogin, onRegister }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -108,6 +108,18 @@ export function Login({ onLogin }: LoginProps) {
             <button type="submit" disabled={loading}>
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
+
+            <small>
+              Chưa có tài khoản?{" "}
+              <button
+                  type="button"
+                  className="register-back-button"
+                  onClick={onRegister}
+              >
+                Đăng ký ngay
+              </button>
+            </small>
+
           </form>
 
           {showForgotPassword && (
