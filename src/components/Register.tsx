@@ -80,11 +80,7 @@ export function Register({ onBackToLogin }: RegisterProps) {
       unsubscribe?.();
       setLoading(false);
 
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Không thể kết nối đến máy chủ. Vui lòng thử lại."
-      );
+      setError(err instanceof Error ? err.message : "Không thể kết nối đến máy chủ. Vui lòng thử lại.");
     }
   };
 
@@ -96,55 +92,27 @@ export function Register({ onBackToLogin }: RegisterProps) {
         <p>Tạo tài khoản để bắt đầu trò chuyện</p>
 
         <label htmlFor="register-username">Tài khoản</label>
-        <input
-          id="register-username"
-          type="text"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-          placeholder="Nhập tên tài khoản"
-          autoComplete="username"
-          required
-        />
+        <input id="register-username" type="text" value={username} onChange={(event) =>
+              setUsername(event.target.value)} placeholder="Nhập tên tài khoản" autoComplete="username" required/>
 
         <label htmlFor="register-password">Mật khẩu</label>
-        <input
-          id="register-password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Nhập mật khẩu"
-          autoComplete="new-password"
-          required
-        />
+        <input id="register-password" type="password" value={password} onChange={(event) =>
+              setPassword(event.target.value)} placeholder="Nhập mật khẩu" autoComplete="new-password" required/>
 
         <label htmlFor="confirm-password">Xác nhận mật khẩu</label>
-        <input
-          id="confirm-password"
-          type="password"
-          value={confirmPassword}
-          onChange={(event) => setConfirmPassword(event.target.value)}
-          placeholder="Nhập lại mật khẩu"
-          autoComplete="new-password"
-          required
-        />
+        <input id="confirm-password" type="password" value={confirmPassword} onChange={(event) =>
+              setConfirmPassword(event.target.value)} placeholder="Nhập lại mật khẩu" autoComplete="new-password" required/>
 
         {error && <p className="login-error">{error}</p>}
 
-        {success && (
-          <p className="register-success">{success}</p>
-        )}
+        {success && (<p className="register-success">{success}</p>)}
 
         <button type="submit" disabled={loading}>
           {loading ? "Đang đăng ký..." : "Đăng ký"}
         </button>
 
-        <small>
-          Đã có tài khoản?{" "}
-          <button
-            type="button"
-            className="register-back-button"
-            onClick={onBackToLogin}
-          >
+        <small>Đã có tài khoản?{" "}
+          <button type="button" className="register-back-button" onClick={onBackToLogin}>
             Đăng nhập
           </button>
         </small>
