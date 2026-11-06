@@ -1,6 +1,8 @@
 export interface WebSocketMessage<T = unknown> {
     event: string;
+    status?: "success" | "error";
     data: T;
+    mes?: string;
 }
 
 type MessageCallback = (message: WebSocketMessage) => void;
@@ -54,12 +56,17 @@ class WebSocketService {
 
                     const message = raw?.data?.event ? raw.data : raw;
 
-                    if (typeof message.event !== 'string') {
-                        console.warn('WebSocket response không hợp lệ:', raw);
+                    if (typeof message.event !== "string") {
+                        console.warn("WebSocket response không hợp lệ:", raw);
                         return;
                     }
 
-                    this.notifyMessage({event: message.event, data: message.data,});
+                    this.notifyMessage({
+                        event: message.event,
+                        status: raw.status ?? message.status,
+                        data: message.data,
+                        mes: raw.mes ?? message.mes,
+                    });
                 } catch (error) {
                     console.error('Lỗi đọc WebSocket message:', error);
                 }
