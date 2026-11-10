@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { mockFriends, mockGroups, type DirectoryEntry } from "../data/mockContacts";
+import { useSelector } from "react-redux";
+import type { RootState } from "../store/store";
+import type { ContactEntry } from "../types/contact";
 
 type DirectoryTab = "friends" | "groups";
 
@@ -7,7 +9,7 @@ function normalize(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
 }
 
-function DirectoryRows({ entries, isGroup }: { entries: DirectoryEntry[]; isGroup: boolean }) {
+function DirectoryRows({ entries, isGroup }: { entries: ContactEntry[]; isGroup: boolean }) {
   let previousLetter = "";
 
   if (entries.length === 0) {
@@ -39,10 +41,12 @@ function DirectoryRows({ entries, isGroup }: { entries: DirectoryEntry[]; isGrou
 }
 
 export function ContactDirectory() {
+  const friends = useSelector((state: RootState) => state.contacts.friends);
+  const groups = useSelector((state: RootState) => state.contacts.groups);
   const [activeTab, setActiveTab] = useState<DirectoryTab>("friends");
   const [query, setQuery] = useState("");
   const [ascending, setAscending] = useState(true);
-  const entries = activeTab === "friends" ? mockFriends : mockGroups;
+  const entries = activeTab === "friends" ? friends : groups;
   const filteredEntries = useMemo(() => {
     const normalizedQuery = normalize(query.trim());
     return entries
@@ -62,12 +66,12 @@ export function ContactDirectory() {
         <button className={`contact-nav-option ${isFriends ? "is-active" : ""}`} aria-pressed={isFriends} onClick={() => setActiveTab("friends")}>
           <span className="contact-option-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1.5a6.5 6.5 0 0 1 13 0V20M16 5a3.5 3.5 0 0 1 0 6.8M18 14a5 5 0 0 1 3.5 4.8V20"/></svg></span>
           <span className="contact-option-copy"><strong>Bạn bè</strong><small>Danh sách bạn bè</small></span>
-          <span className="contact-option-count">{mockFriends.length}</span>
+          <span className="contact-option-count">{friends.length}</span>
         </button>
         <button className={`contact-nav-option ${!isFriends ? "is-active" : ""}`} aria-pressed={!isFriends} onClick={() => setActiveTab("groups")}>
           <span className="contact-option-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20v-1.5a6.5 6.5 0 0 1 13 0V20M16 15a5 5 0 0 1 5 5"/></svg></span>
           <span className="contact-option-copy"><strong>Nhóm</strong><small>Danh sách nhóm</small></span>
-          <span className="contact-option-count">{mockGroups.length}</span>
+          <span className="contact-option-count">{groups.length}</span>
         </button>
       </div>
     </section>
