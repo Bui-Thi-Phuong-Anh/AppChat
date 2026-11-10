@@ -1,22 +1,31 @@
 import { useState, type FormEvent } from "react";
-import { websocketService } from "../services/websocket";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "../store/store";
+import { authService } from "../services/authService";
+import {setCredentials, setLoading, setAuthError, clearAuthError,} from "../features/auth/authSlice";
 
-type LoginResponse = { RE_LOGIN_CODE?: string; mes?: string; message?: string; };
+type LoginResponse = { RE_LOGIN_CODE?: string; };
+
 type LoginProps = { onLogin: (userId: string, reLoginCode: string) => void; onRegister: () => void; };
 
 export function Login({ onLogin, onRegister }: LoginProps) {
+  const dispatch = useDispatch<AppDispatch>();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
     setError("");
     setForgotMessage("");
+    dispatch(clearAuthError());
 
     const user = username.trim();
 
@@ -32,38 +41,36 @@ export function Login({ onLogin, onRegister }: LoginProps) {
 
     if (loading) return;
 
-    setLoading(true);
-
-    let unsubscribe: (() => void) | undefined;
+    setIsLoading(true);
+    dispatch(setLoading(true));
 
     try {
+      const { websocketService } = await import("../services/websocket");
       await websocketService.connect();
 
-      unsubscribe = websocketService.on("LOGIN", (message) => {
-        const data = message.data as LoginResponse;
+      const response = await authService.login(user, password);
 
-        setLoading(false);
+      if (response.status !== "success") {
+        throw new Error(response.mes || "Tên đăng nhập hoặc mật khẩu không chính xác.");
+      }
 
-        if (data?.RE_LOGIN_CODE) {
-          unsubscribe?.();
-          onLogin(user, data.RE_LOGIN_CODE);
-          return;
-        }
+      const data = response.data as LoginResponse;
+      const code = data?.RE_LOGIN_CODE;
 
-        setError(data?.mes || data?.message || "Tên đăng nhập hoặc mật khẩu không chính xác.");
+      if (!code) {
+        throw new Error("Server không trả về mã phiên đăng nhập.");
+      }
 
-        unsubscribe?.();
-      });
+      dispatch(setCredentials({userId: user, reLoginCode: code,}));
 
-      websocketService.send("LOGIN", {
-        user,
-        pass: password,
-      });
+      onLogin(user, code);
     } catch (err) {
-      unsubscribe?.();
-      setLoading(false);
-
-      setError(err instanceof Error ? err.message : "Không thể kết nối đến máy chủ. Vui lòng thử lại.");
+      const message = err instanceof Error ? err.message : "Không thể kết nối đến máy chủ. Vui lòng thử lại.";
+      setError(message);
+      dispatch(setAuthError(message));
+    } finally {
+      setIsLoading(false);
+      dispatch(setLoading(false));
     }
   };
 
@@ -81,69 +88,82 @@ export function Login({ onLogin, onRegister }: LoginProps) {
       return;
     }
 
-    setForgotMessage("Chức năng khôi phục mật khẩu hiện chưa được API hỗ trợ.");
+    setForgotMessage(
+        "Chức năng khôi phục mật khẩu hiện chưa được API hỗ trợ."
+    );
   };
 
-  return (<div className="login-page">
-          <form className="login-form" onSubmit={handleSubmit}>
-            <h1>AppChat</h1>
-            <p>Đăng nhập để tiếp tục trò chuyện</p>
+  return (
+      <div className="login-page">
+        <form className="login-form" onSubmit={handleSubmit}>
+          <h1>AppChat</h1>
+          <p>Đăng nhập để tiếp tục trò chuyện</p>
 
-            <label htmlFor="username">Tài khoản</label>
-            <input id="username" type="text" value={username} onChange={(event) =>
-                setUsername(event.target.value)} placeholder="Nhập tên tài khoản" autoComplete="username" required/>
+          <label htmlFor="username">Tài khoản</label>
+          <input id="username" type="text" value={username} onChange={(event) =>
+                  setUsername(event.target.value)} placeholder="Nhập tên tài khoản" autoComplete="username" required/>
 
-            <label htmlFor="password">Mật khẩu</label>
-            <input id="password" type="password" value={password} onChange={(event) =>
-                setPassword(event.target.value)} placeholder="Nhập mật khẩu" autoComplete="current-password" required/>
+          <label htmlFor="password">Mật khẩu</label>
 
-            <div className="forgot-password">
-              <button type="button" onClick={handleForgotPassword}>
-                Quên mật khẩu?
-              </button>
-            </div>
+          <div style={{ position: "relative", width: "100%" }}>
+            <input id="password" type={showPassword ? "text" : "password"} value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Nhập mật khẩu" autoComplete="current-password" required
+                style={{width: "100%", paddingRight: "40px",}}/>
 
-            {error && <p className="login-error">{error}</p>}
+            <span onClick={() => setShowPassword((prev) => !prev)} role="button" tabIndex={0} aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setShowPassword((prev) => !prev);
+                  }}}
+                style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", zIndex: 2, fontSize: "20px", color: "#333",}}>
+              <i className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"} />
+            </span>
+          </div>
 
-            <button type="submit" disabled={loading}>
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          <div className="forgot-password">
+            <button type="button" onClick={handleForgotPassword}>
+              Quên mật khẩu?
             </button>
+          </div>
 
-            <small>
-              Chưa có tài khoản?{" "}
-              <button
-                  type="button"
-                  className="register-back-button"
-                  onClick={onRegister}
-              >
-                Đăng ký ngay
-              </button>
-            </small>
+          {error && <p className="login-error">{error}</p>}
 
-          </form>
+          <button type="submit" disabled={loading}>
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          </button>
 
-          {showForgotPassword && (
-              <div className="forgot-overlay">
-                <form className="forgot-form" onSubmit={handleSendEmail}>
-                  <h2>Quên mật khẩu?</h2>
-                  <p>Nhập email của bạn để yêu cầu khôi phục mật khẩu.</p>
+          <small>
+            Chưa có tài khoản?{" "}
+            <button type="button" className="register-back-button" onClick={onRegister}>
+              Đăng ký ngay
+            </button>
+          </small>
+        </form>
 
-                  <label htmlFor="email">Địa chỉ email</label>
-                  <input id="email" type="email" value={email} onChange={(event) =>
-                      setEmail(event.target.value)} placeholder="example@gmail.com" required/>
+        {showForgotPassword && (
+            <div className="forgot-overlay">
+              <form className="forgot-form" onSubmit={handleSendEmail}>
+                <h2>Quên mật khẩu?</h2>
+                <p>Nhập email của bạn để yêu cầu khôi phục mật khẩu.</p>
 
-                  {forgotMessage && (<p className="forgot-message">{forgotMessage}</p>)}
+                <label htmlFor="email">Địa chỉ email</label>
+                <input id="email" type="email" value={email} onChange={(event) =>
+                        setEmail(event.target.value)} placeholder="example@gmail.com" required/>
 
-                  <button type="submit">Gửi yêu cầu</button>
+                {forgotMessage && (<p className="forgot-message">{forgotMessage}</p>)}
 
-                  <button type="button" className="cancel-button" onClick={() => {
-                        setShowForgotPassword(false);
-                        setForgotMessage("");}}>
-                    Quay lại đăng nhập
-                  </button>
-                </form>
-              </div>
-          )}
-        </div>
+                <button type="submit">Gửi yêu cầu</button>
+
+                <button type="button" className="cancel-button" onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotMessage("");
+                    }}>
+                  Quay lại đăng nhập
+                </button>
+              </form>
+            </div>
+        )}
+      </div>
   );
 }
