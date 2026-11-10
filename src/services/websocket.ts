@@ -12,11 +12,14 @@ export type WebSocketState = | 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ER
 
 class WebSocketService {
     private socket: WebSocket | null = null;
-
+    private status: WebSocketState = "DISCONNECTED";
     private messageListeners = new Map<string, Set<MessageCallback>>();
     private statusListeners = new Set<StatusCallback>();
 
     private readonly url = 'wss://chat.longapp.io.vn/chat/chat';
+    getStatus(): WebSocketState {
+        return this.status;
+    }
 
     connect(): Promise<void> {
         if (this.socket?.readyState === WebSocket.OPEN) {
@@ -123,6 +126,7 @@ class WebSocketService {
     }
 
     private notifyStatus(status: WebSocketState): void {
+        this.status = status;
         this.statusListeners.forEach((callback) => callback(status));
     }
 

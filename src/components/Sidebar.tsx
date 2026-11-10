@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { SettingsDialog } from "./SettingsDialog";
+import { useSelector } from "react-redux";
+import type { RootState } from "../store/store";
+import {websocketService, type WebSocketState} from "../services/websocket.ts";
 
 type SidebarProps = {
   activeSection: string;
@@ -27,6 +30,15 @@ export function Sidebar({ activeSection, onSectionChange, settingsOpen, onSettin
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileActionsRef = useRef<HTMLDivElement>(null);
   const settingsAnchorRef = useRef<HTMLDivElement>(null);
+  const userId = useSelector((state: RootState) => state.auth.userId);
+  const [connectionStatus, setConnectionStatus] = useState<WebSocketState>(
+      websocketService.getStatus()
+  );
+  const displayName = userId || "Người dùng";
+
+  const avatarText = displayName
+      .slice(0, 2)
+      .toUpperCase();
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -50,6 +62,14 @@ export function Sidebar({ activeSection, onSectionChange, settingsOpen, onSettin
     return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
   }, [settingsOpen, onSettingsToggle]);
 
+  useEffect(() => {
+    const unsubscribe = websocketService.onStatus((status) => {
+      setConnectionStatus(status);
+    });
+
+    return unsubscribe;
+  }, []);
+
   return <aside className="sidebar">
     <a className="brand" href="#" aria-label="AppChat"><span className="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1 2v-5.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8 11h.01M12 11h.01M16 11h.01" /></svg></span><span>AppChat</span></a>
     <nav className="sidebar-nav" aria-label="&#272;i&#7873;u h&#432;&#7899;ng ch&#237;nh">
@@ -67,14 +87,34 @@ export function Sidebar({ activeSection, onSectionChange, settingsOpen, onSettin
       })}
     </nav>
     <div className="user-profile">
-      <div className="profile-avatar">AL<span className="online-dot" /></div>
-      <div className="profile-copy"><strong>Anh L&#234;</strong><span>&#272;ang ho&#7841;t &#273;&#7897;ng</span></div>
-      <div className="profile-actions" ref={profileActionsRef}>
-        <button className="more-button" aria-label="T&#249;y ch&#7885;n t&#224;i kho&#7843;n" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen((open) => !open)}>&#8230;</button>
-        {profileMenuOpen && <div className="profile-menu"><button className="settings-logout" onClick={() => { setProfileMenuOpen(false); onLogout(); }}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3m9-8h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7" /></svg>
-          &#272;&#259;ng xu&#7845;t
-        </button></div>}
+      <div className="profile-avatar">
+        {avatarText}
+        <span className="online-dot" />
+      </div>
+
+      <div className="profile-copy" style={{display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1, minWidth: 0}}>
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <strong>{displayName}</strong>
+          <span>{connectionStatus === "CONNECTED" ? "Đang hoạt động" : connectionStatus === "CONNECTING" ? "Đang kết nối..." : "Ngoại tuyến"}
+          </span>
+        </div>
+
+        <div className="profile-actions" ref={profileActionsRef} style={{ flexShrink: 0, marginLeft: "8px" }}>
+          <button className="more-button" aria-label="Tùy chọn tài khoản" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen((open) => !open)}>
+            &#8230;
+          </button>
+
+          {profileMenuOpen && (
+              <div className="profile-menu">
+                <button className="settings-logout" onClick={() => {setProfileMenuOpen(false);onLogout();}}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M10 17l5-5-5-5M15 12H3m9-8h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7" />
+                  </svg>
+                  Đăng xuất
+                </button>
+              </div>
+          )}
+        </div>
       </div>
     </div>
   </aside>;
