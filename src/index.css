@@ -541,3 +541,15 @@ button { color: inherit; }
   color: #4f46e5;
   text-decoration: underline;
 }
+
+.search-result {
+  margin-top: 8px;
+}
+
+.search-result-label {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+}
