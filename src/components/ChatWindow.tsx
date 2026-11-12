@@ -2,13 +2,13 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import type { Chat } from '../types/chat'
 
-
 type ChatWindowProps = {
     chat: Chat | null
     currentUserId: string
+    onMessageSent?: () => void
 }
 
-export default function ChatWindow({chat, currentUserId,}: ChatWindowProps) {
+export default function ChatWindow({chat, currentUserId, onMessageSent,}: ChatWindowProps) {
     if (!chat) {
         return (<main className="chat-window chat-window-empty">
                     <div className="empty-chat">
@@ -28,13 +28,22 @@ export default function ChatWindow({chat, currentUserId,}: ChatWindowProps) {
 
                     <div className="chat-header-info">
                         <h2>{chat.name}</h2>
-                        <span>{chat.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                        <span>
+                            {chat.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                        </span>
                     </div>
                 </header>
 
-                <MessageList chatId={chat.id} currentUserId={currentUserId}/>
+                <MessageList
+                    chatId={chat.id}
+                    currentUserId={currentUserId}
+                />
 
-                <MessageInput chatId={chat.id} currentUserId={currentUserId}/>
+                <MessageInput
+                    chatId={chat.id}
+                    currentUserId={currentUserId}
+                    onMessageSent={onMessageSent}
+                />
             </main>
     )
 }

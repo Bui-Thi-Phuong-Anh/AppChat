@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import { useDispatch, useSelector } from "react-redux";
+import {useDispatch, useSelector, useStore} from "react-redux";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { ChatList } from "./components/ChatList";
 import { ContactDirectory } from "./components/ContactDirectory";
@@ -17,6 +17,7 @@ import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
 import type { ContactEntry } from "./types/contact";
 import "./App.css";
+import {userService} from "./services/userService.ts";
 
 function mapUserToContact(item: UserListItem, type: "friend" | "group"): ContactEntry {
     return {
@@ -45,11 +46,13 @@ function mapContactToChat(contact: ContactEntry): Chat {
 function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
+    const store = useStore<RootState>();
 
     const [query, setQuery] = useState("");
     const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
     const [activeSection, setActiveSection] = useState("Tin nhắn");
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [searchingUser, setSearchingUser] = useState(false);
     const [theme, setTheme] = useState<"light" | "dark">("light");
 
     const friends = useSelector((state: RootState) => state.contacts.friends);
@@ -58,11 +61,53 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
 
     // Gộp bạn bè và nhóm thành danh sách
     const chats = useMemo(() => {
-        return [
-            ...friends.map(contact => mapContactToChat(contact)),
-            ...groups.map(contact => mapContactToChat(contact)),
+        const contactChats = [
+            ...friends.map(mapContactToChat),
+            ...groups.map(mapContactToChat),
         ];
-    }, [friends, groups]);
+
+        // Thêm cuộc trò chuyện vừa tìm thấy nếu chưa có trong danh sách.
+        if (selectedChat && !contactChats.some(chat => chat.id.toLowerCase() === selectedChat.id.toLowerCase())) {
+            contactChats.unshift(selectedChat);
+        }
+
+        return contactChats;
+    }, [friends, groups, selectedChat]);
+
+    const refreshUserList = async () => {
+        try {
+            const items = await contactService.getUserList();
+
+            const serverFriends = items
+                .filter(item => item.type === 0)
+                .map(item => mapUserToContact(item, "friend"));
+
+            const serverGroups = items
+                .filter(item => item.type === 1)
+                .map(item => mapUserToContact(item, "group"));
+
+            // Lấy danh sách Redux mới nhất, tránh sử dụng friends từ closure cũ.
+            const currentFriends = store.getState().contacts.friends;
+
+            const mergedFriends = [...serverFriends];
+
+            currentFriends.forEach(friend => {
+                const existed = mergedFriends.some(
+                    item => item.name.toLowerCase() === friend.name.toLowerCase()
+                );
+
+                if (!existed) {
+                    mergedFriends.push(friend);
+                }
+            });
+
+            dispatch(setFriends(mergedFriends));
+            dispatch(setGroups(serverGroups));
+
+        } catch (error) {
+            console.error("Không thể cập nhật danh sách:", error);
+        }
+    };
 
     // Tìm tin nhắn mới nhất và lọc theo tên cuộc trò chuyện
     const filteredChats = useMemo(() => {
@@ -121,12 +166,10 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
 
                 if (cancelled) return;
 
-                // type = 0: người đã trò chuyện.
                 const friends = items
                     .filter(item => item.type === 0)
                     .map(item => mapUserToContact(item, "friend"));
 
-                // type = 1: nhóm.
                 const groups = items
                     .filter(item => item.type === 1)
                     .map(item => mapUserToContact(item, "group"));
@@ -136,7 +179,13 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
 
             } catch (error) {
                 if (!cancelled) {
-                    dispatch(setContactsError(error instanceof Error ? error.message : "Không thể tải danh bạ"));
+                    dispatch(
+                        setContactsError(
+                            error instanceof Error
+                                ? error.message
+                                : "Không thể tải danh bạ"
+                        )
+                    );
                 }
             } finally {
                 if (!cancelled) {
@@ -144,10 +193,85 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
                 }
             }
         };
-        loadContacts();
 
-        return () => {cancelled = true;};
+        void loadContacts();
+
+        return () => {
+            cancelled = true;
+        };
     }, [dispatch]);
+
+    const handleSearchUser = async (username: string) => {
+        const user = username.trim();
+
+        if (!user || searchingUser) return;
+
+        if (user.toLowerCase() === currentUserId.toLowerCase()) {
+            alert("Bạn không thể tìm chính mình.");
+            return;
+        }
+
+        setSearchingUser(true);
+
+        try {
+            const exists = await userService.checkUserExist(user);
+
+            if (!exists) {
+                alert("Không tìm thấy tài khoản.");
+                return;
+            }
+
+            let online = false;
+
+            try {
+                online = await userService.checkUserOnline(user);
+            } catch {
+                // Không lấy được trạng thái online nhưng tài khoản vẫn tồn tại.
+            }
+
+            const chat: Chat = {
+                id: user,
+                name: user,
+                avatar: user.slice(0, 2).toUpperCase(),
+                avatarColor: "#989bff",
+                lastMessage: "",
+                time: "",
+                online,
+            };
+
+            const newContact: ContactEntry = {
+                id: user,
+                name: user,
+                initials: user.slice(0, 2).toUpperCase(),
+                color: "#989bff",
+                detail: "",
+                online,
+            };
+
+            // Không thêm trùng tài khoản.
+            const alreadyExists = friends.some(
+                friend => friend.name.toLowerCase() === user.toLowerCase()
+            );
+
+            if (!alreadyExists) {
+                dispatch(setFriends([...friends, newContact]));
+            }
+
+            // Mở cuộc trò chuyện.
+            setSelectedChat(chat);
+            setActiveSection("Tin nhắn");
+            setQuery("");
+
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Không thể tìm kiếm người dùng."
+            );
+        } finally {
+            setSearchingUser(false);
+        }
+    };
 
     return (
         <main className={`app-shell ${theme === "dark" ? "theme-dark" : ""} ${activeSection === "Danh bạ" ? "contacts-view" : ""}`}>
@@ -161,11 +285,22 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
                 <ContactDirectory />
             ) : (
                 <>
-                    <ChatList chats={filteredChats} selectedId={selectedChat?.id} onSelect={setSelectedChat}
-                        query={query} onQueryChange={setQuery}/>
+                    <ChatList
+                        chats={filteredChats}
+                        selectedId={selectedChat?.id}
+                        onSelect={setSelectedChat}
+                        query={query}
+                        onQueryChange={setQuery}
+                        onSearchUser={handleSearchUser}
+                        searchingUser={searchingUser}
+                    />
 
                     <section className="conversation-panel" aria-label="Nội dung cuộc trò chuyện">
-                        <ChatWindow chat={selectedChat} currentUserId={currentUserId}/>
+                        <ChatWindow
+                            chat={selectedChat}
+                            currentUserId={currentUserId}
+                            onMessageSent={refreshUserList}
+                        />
                     </section>
                 </>
             )}
