@@ -21,67 +21,78 @@ export function Register({ onBackToLogin }: RegisterProps) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+      event.preventDefault();
 
-    setError("");
-    setSuccess("");
+      setError("");
+      setSuccess("");
 
-    const user = username.trim();
+      const user = username.trim();
 
-    if (!user) {
-      setError("Vui lòng nhập tài khoản.");
-      return;
-    }
+      if (!user) {
+          setError("Vui lòng nhập tài khoản.");
+          return;
+      }
 
-    if (!password.trim()) {
-      setError("Vui lòng nhập mật khẩu.");
-      return;
-    }
+      if (!password.trim()) {
+          setError("Vui lòng nhập mật khẩu.");
+          return;
+      }
 
-    if (password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự.");
-      return;
-    }
+      if (password.length < 6) {
+          setError("Mật khẩu phải có ít nhất 6 ký tự.");
+          return;
+      }
 
-    if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp.");
-      return;
-    }
+      if (password !== confirmPassword) {
+          setError("Mật khẩu xác nhận không khớp.");
+          return;
+      }
 
-    if (loading) return;
+      if (loading) return;
 
-    setLoading(true);
+      setLoading(true);
 
-    let unsubscribe: (() => void) | undefined;
+      let unsubscribe: (() => void) | undefined;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
 
-    try {
-      await websocketService.connect();
+      try {
+          await websocketService.connect();
 
-        unsubscribe = websocketService.on("REGISTER", (message) => {
-            const response = message as RegisterResponse;
+          unsubscribe = websocketService.on("REGISTER", (message) => {
+              const response = message as RegisterResponse;
 
-            if (response.status === "success") {
-                setSuccess(response.data || "Đăng ký tài khoản thành công!");
-                setError("");
-            } else {
-                setError(response.mes || "Đăng ký thất bại!");
-                setSuccess("");
-            }
+              if (response.status === "success") {
+                  setSuccess(response.data || "Đăng ký tài khoản thành công!");
+                  setError("");
+              } else {
+                  setError(response.mes || "Đăng ký thất bại!");
+                  setSuccess("");
+              }
 
-            setLoading(false);
+              if (timeout) clearTimeout(timeout);
+              unsubscribe?.();
+              setLoading(false);
+          });
+
+          // Chờ server phản hồi tối đa 10 giây.
+          timeout = setTimeout(() => {
             unsubscribe?.();
-        });
+            setError("Máy chủ không phản hồi. Vui lòng thử lại.");
+            setLoading(false);
+          }, 10000);
 
-      websocketService.send("REGISTER", {
-        user,
-        pass: password,
-      });
-    } catch (err) {
-      unsubscribe?.();
-      setLoading(false);
+          websocketService.send("REGISTER", {
+             user,
+             pass: password,
+          });
 
-      setError(err instanceof Error ? err.message : "Không thể kết nối đến máy chủ. Vui lòng thử lại.");
-    }
+      } catch (err) {
+          if (timeout) clearTimeout(timeout);
+          unsubscribe?.();
+          setLoading(false);
+
+          setError(err instanceof Error ? err.message : "Không thể kết nối đến máy chủ. Vui lòng thử lại.");
+      }
   };
 
   return (
