@@ -93,6 +93,7 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
         avatarColor: "#989bff",
         lastMessage: "Bắt đầu cuộc trò chuyện",
         time: "",
+        kind: "people",
       }
       : null;
 

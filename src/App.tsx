@@ -30,7 +30,7 @@ function mapUserToContact(item: UserListItem, type: "friend" | "group"): Contact
     };
 }
 
-function mapContactToChat(contact: ContactEntry): Chat {
+function mapContactToChat(contact: ContactEntry, kind: "people" | "group"): Chat {
     return {
         id: contact.id,
         name: contact.name,
@@ -39,6 +39,7 @@ function mapContactToChat(contact: ContactEntry): Chat {
         lastMessage: "",
         time: "",
         online: contact.online,
+        kind,
     };
 }
 
@@ -62,8 +63,8 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
     // Gộp bạn bè và nhóm thành danh sách
     const chats = useMemo(() => {
         const contactChats = [
-            ...friends.map(mapContactToChat),
-            ...groups.map(mapContactToChat),
+            ...friends.map(contact => mapContactToChat(contact, "people")),
+            ...groups.map(contact => mapContactToChat(contact, "group")),
         ];
 
         // Thêm cuộc trò chuyện vừa tìm thấy nếu chưa có trong danh sách.
@@ -237,6 +238,7 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
                 lastMessage: "",
                 time: "",
                 online,
+                kind: "people",
             };
 
             const newContact: ContactEntry = {
