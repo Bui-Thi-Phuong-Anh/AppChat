@@ -13,6 +13,7 @@ import { authService } from "./services/authService";
 import { contactService } from "./services/contactService";
 import type { UserListItem } from "./services/contactService";
 import {setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
+import { fetchPeopleChatHistory } from "./features/messages/messagesSlice";
 import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
 import type { ContactEntry } from "./types/contact";
@@ -59,6 +60,17 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
     const friends = useSelector((state: RootState) => state.contacts.friends);
     const groups = useSelector((state: RootState) => state.contacts.groups);
     const messages = useSelector((state: RootState) => state.messages.messages);
+
+    // Nạp trước lịch sử trang đầu để danh sách chat có preview và thời gian ngay khi mở ứng dụng.
+    useEffect(() => {
+        friends.forEach((friend) => {
+            void dispatch(fetchPeopleChatHistory({
+                username: friend.name,
+                chatId: friend.id,
+                page: 1,
+            }));
+        });
+    }, [dispatch, friends]);
 
     // Gộp bạn bè và nhóm thành danh sách
     const chats = useMemo(() => {
