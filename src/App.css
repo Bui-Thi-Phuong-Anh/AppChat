@@ -140,6 +140,9 @@
 .theme-dark .directory-avatar { color: #1f2937; }
 .theme-dark .message-list { background: #0f172a; }
 .theme-dark .message-row.received .message-bubble { border-color: #374151; background: #1f2937; color: #e5e7eb; }
+.theme-dark .message-sender-avatar { background: #312e81; color: #c7d2fe; }
+.theme-dark .history-load-more { border-color: #374151; background: #1f2937; color: #c7d2fe; }
+.theme-dark .history-error button { border-color: #7f1d1d; background: #3f1d2a; color: #fecaca; }
 .theme-dark .empty-messages { color: #9ca3af; }
 .theme-dark .message-input { border-color: #374151; background: #1f2937; box-shadow: none; }
 .theme-dark .profile-menu, .theme-dark .settings-dialog { border-color: #374151; background: #1f2937; }
