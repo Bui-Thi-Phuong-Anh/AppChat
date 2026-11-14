@@ -46,7 +46,37 @@ const messagesSlice = createSlice({
   initialState,
   reducers: {
     addMessage: (state, action: PayloadAction<ChatMessage>) => {
-      state.messages.push(action.payload);
+      const alreadyAdded = state.messages.some(
+        (message) =>
+          message.chatId === action.payload.chatId &&
+          message.id === action.payload.id &&
+          message.senderId === action.payload.senderId &&
+          message.recipientId === action.payload.recipientId &&
+          message.content === action.payload.content &&
+          message.createdAt === action.payload.createdAt,
+      );
+      if (!alreadyAdded) state.messages.push(action.payload);
+    },
+    replaceMessage: (state, action: PayloadAction<{ id: string; message: ChatMessage }>) => {
+      const chatId = action.payload.message.chatId;
+      const optimisticIndex = state.messages.findIndex(
+        (message) => message.chatId === chatId && message.id === action.payload.id,
+      );
+      if (optimisticIndex < 0) return;
+
+      const confirmedIndex = state.messages.findIndex(
+        (message) => message.chatId === chatId && message.id === action.payload.message.id,
+      );
+      if (confirmedIndex >= 0 && confirmedIndex !== optimisticIndex) {
+        state.messages.splice(optimisticIndex, 1);
+        return;
+      }
+      state.messages[optimisticIndex] = action.payload.message;
+    },
+    removeMessage: (state, action: PayloadAction<{ chatId: string; id: string }>) => {
+      state.messages = state.messages.filter(
+        (message) => message.chatId !== action.payload.chatId || message.id !== action.payload.id,
+      );
     },
     deleteMessage: (state, action: PayloadAction<string>) => {
       state.messages = state.messages.filter((message) => message.id !== action.payload);
@@ -77,8 +107,14 @@ const messagesSlice = createSlice({
         state.historyByChat[chatId] = history;
 
         if (page === 1) {
+          const currentMessages = state.messages.filter((message) => message.chatId === chatId);
+          const loadedIds = new Set(messages.map((message) => message.id));
+          const realtimeMessages = currentMessages.filter(
+            (message) => message.orderAt && !loadedIds.has(message.id),
+          );
           state.messages = state.messages.filter((message) => message.chatId !== chatId);
           state.messages.push(...messages);
+          state.messages.push(...realtimeMessages);
         } else {
           const existingIds = new Set(state.messages.filter((message) => message.chatId === chatId).map((message) => message.id));
           state.messages.push(...messages.filter((message) => !existingIds.has(message.id)));
@@ -100,5 +136,5 @@ const messagesSlice = createSlice({
   },
 });
 
-export const { addMessage, deleteMessage } = messagesSlice.actions;
+export const { addMessage, replaceMessage, removeMessage, deleteMessage } = messagesSlice.actions;
 export default messagesSlice.reducer;

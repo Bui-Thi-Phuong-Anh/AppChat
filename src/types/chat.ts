@@ -19,5 +19,6 @@ export type ChatMessage = {
   recipientName?: string;
   content: string;
   createdAt: string;
+  orderAt?: string;
   type?: number;
 };
