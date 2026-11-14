@@ -13,6 +13,7 @@ import { authService } from "./services/authService";
 import { contactService } from "./services/contactService";
 import type { UserListItem } from "./services/contactService";
 import {setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
+import { fetchPeopleChatHistory } from "./features/messages/messagesSlice";
 import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
 import type { ContactEntry } from "./types/contact";
@@ -30,7 +31,7 @@ function mapUserToContact(item: UserListItem, type: "friend" | "group"): Contact
     };
 }
 
-function mapContactToChat(contact: ContactEntry): Chat {
+function mapContactToChat(contact: ContactEntry, kind: "people" | "group"): Chat {
     return {
         id: contact.id,
         name: contact.name,
@@ -39,6 +40,7 @@ function mapContactToChat(contact: ContactEntry): Chat {
         lastMessage: "",
         time: "",
         online: contact.online,
+        kind,
     };
 }
 
@@ -59,11 +61,22 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
     const groups = useSelector((state: RootState) => state.contacts.groups);
     const messages = useSelector((state: RootState) => state.messages.messages);
 
+    // Nạp trước lịch sử trang đầu để danh sách chat có preview và thời gian ngay khi mở ứng dụng.
+    useEffect(() => {
+        friends.forEach((friend) => {
+            void dispatch(fetchPeopleChatHistory({
+                username: friend.name,
+                chatId: friend.id,
+                page: 1,
+            }));
+        });
+    }, [dispatch, friends]);
+
     // Gộp bạn bè và nhóm thành danh sách
     const chats = useMemo(() => {
         const contactChats = [
-            ...friends.map(mapContactToChat),
-            ...groups.map(mapContactToChat),
+            ...friends.map(contact => mapContactToChat(contact, "people")),
+            ...groups.map(contact => mapContactToChat(contact, "group")),
         ];
 
         // Thêm cuộc trò chuyện vừa tìm thấy nếu chưa có trong danh sách.
@@ -237,6 +250,7 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
                 lastMessage: "",
                 time: "",
                 online,
+                kind: "people",
             };
 
             const newContact: ContactEntry = {

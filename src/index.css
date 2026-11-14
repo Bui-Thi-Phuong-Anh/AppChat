@@ -149,6 +149,7 @@ button { color: inherit; }
 
 .message-row {
   display: flex;
+  align-items: flex-start;
   width: 100%;
   margin-bottom: 10px;
 }
@@ -161,12 +162,67 @@ button { color: inherit; }
   justify-content: flex-start;
 }
 
+.message-content-wrap {
+  min-width: 0;
+  max-width: 78%;
+}
+
+.message-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 5px 38px;
+  color: #475569;
+  font-size: 11px;
+}
+
+.message-row.sent .message-meta {
+  justify-content: flex-end;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.message-row.sent .message-body {
+  justify-content: flex-end;
+}
+
+.message-sender-name {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.message-time {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.message-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .message-bubble {
-  max-width: 70%;
+  max-width: 100%;
+  min-width: 0;
   padding: 10px 14px;
   border-radius: 16px;
   overflow-wrap: anywhere;
   box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+}
+
+.message-sender-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .message-row.sent .message-bubble {
@@ -189,14 +245,6 @@ button { color: inherit; }
   white-space: pre-wrap;
 }
 
-.message-time {
-  display: block;
-  margin-top: 5px;
-  font-size: 11px;
-  text-align: right;
-  opacity: 0.75;
-}
-
 .empty-messages {
   margin: auto;
   padding: 20px;
@@ -204,6 +252,43 @@ button { color: inherit; }
   font-size: 14px;
   text-align: center;
   line-height: 1.6;
+}
+
+.history-load-more {
+  align-self: center;
+  margin: 0 auto 16px;
+  padding: 8px 13px;
+  border: 1px solid #dbe1ea;
+  border-radius: 18px;
+  background: #fff;
+  color: #4f46e5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.history-load-more:disabled,
+.history-error button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.history-error {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 14px;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.history-error button {
+  padding: 5px 9px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: #b91c1c;
+  cursor: pointer;
 }
 
 .message-input-container {
