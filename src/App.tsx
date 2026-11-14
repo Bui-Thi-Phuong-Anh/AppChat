@@ -13,7 +13,8 @@ import { authService } from "./services/authService";
 import { contactService } from "./services/contactService";
 import type { UserListItem } from "./services/contactService";
 import {setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
-import { fetchPeopleChatHistory } from "./features/messages/messagesSlice";
+import { addMessage, fetchPeopleChatHistory } from "./features/messages/messagesSlice";
+import { websocketService } from "./services/websocket";
 import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
 import type { ContactEntry } from "./types/contact";
@@ -60,6 +61,41 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
     const friends = useSelector((state: RootState) => state.contacts.friends);
     const groups = useSelector((state: RootState) => state.contacts.groups);
     const messages = useSelector((state: RootState) => state.messages.messages);
+
+    // Receive forwarded 1-1 messages; outgoing acknowledgements are handled by peopleChatService.
+    useEffect(() => websocketService.on("SEND_CHAT", (message) => {
+        if (message.status === "error") return;
+
+        const data = message.data as {
+            id?: string | number;
+            name?: string;
+            to?: string;
+            mes?: string;
+            createAt?: string;
+            type?: number | string | null;
+        } | null;
+        if (!data || typeof data.name !== "string" || typeof data.to !== "string" || typeof data.mes !== "string") return;
+        // The sender already adds the matching SEND_CHAT acknowledgement when the request resolves.
+        if (data.name.trim().toLowerCase() === currentUserId.trim().toLowerCase()) return;
+        if (data.to.trim().toLowerCase() !== currentUserId.trim().toLowerCase()) return;
+
+        const chatId = friends.find(
+            (friend) => friend.id.trim().toLowerCase() === data.name.trim().toLowerCase(),
+        )?.id ?? data.name;
+
+        dispatch(addMessage({
+            id: String(data.id ?? crypto.randomUUID()),
+            chatId,
+            senderId: data.name,
+            senderName: data.name,
+            recipientId: data.to,
+            recipientName: data.to,
+            content: data.mes,
+            createdAt: data.createAt ?? new Date().toISOString(),
+            orderAt: new Date().toISOString(),
+            type: typeof data.type === "number" ? data.type : 0,
+        }));
+    }), [currentUserId, dispatch, friends]);
 
     // Nạp trước lịch sử trang đầu để danh sách chat có preview và thời gian ngay khi mở ứng dụng.
     useEffect(() => {
@@ -130,8 +166,8 @@ function ChatWorkspace({ currentUserId }: { currentUserId: string }) {
                     .filter((message) => message.chatId === chat.id)
                     .sort(
                         (a, b) =>
-                            new Date(b.createdAt).getTime() -
-                            new Date(a.createdAt).getTime()
+                            new Date(b.orderAt ?? b.createdAt).getTime() -
+                            new Date(a.orderAt ?? a.createdAt).getTime()
                     )[0];
 
                 return {

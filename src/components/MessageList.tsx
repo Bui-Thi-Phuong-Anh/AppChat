@@ -29,7 +29,7 @@ export default function MessageList({ chatId, currentUserId, username, isPeopleC
   const chatMessages = messages
     .filter((message) => message.chatId === chatId)
     .slice()
-    .sort((a, b) => getTimestamp(a.createdAt) - getTimestamp(b.createdAt));
+    .sort((a, b) => getTimestamp(a.orderAt ?? a.createdAt) - getTimestamp(b.orderAt ?? b.createdAt));
 
   const latestMessageId = chatMessages.at(-1)?.id;
   const firstPageLoaded = history?.loadedPages.includes(1) ?? false;
