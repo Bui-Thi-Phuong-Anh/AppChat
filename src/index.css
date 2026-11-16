@@ -345,7 +345,9 @@ button { color: inherit; }
 }
 
 .send-button:disabled {
-  opacity: 0.5;
+  background: #a5a6f6;
+  color: #f8fafc;
+  opacity: 1;
   cursor: not-allowed;
 }
 
