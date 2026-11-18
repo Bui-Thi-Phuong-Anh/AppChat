@@ -8,17 +8,21 @@ export interface WebSocketMessage<T = unknown> {
 type MessageCallback = (message: WebSocketMessage) => void;
 type StatusCallback = (status: WebSocketState) => void;
 
-export type WebSocketState = | 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+export type WebSocketState = | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ERROR";
 
 class WebSocketService {
     private socket: WebSocket | null = null;
     private status: WebSocketState = "DISCONNECTED";
     private messageListeners = new Map<string, Set<MessageCallback>>();
     private statusListeners = new Set<StatusCallback>();
-
     private readonly url = 'wss://chat.longapp.io.vn/chat/chat';
+
     getStatus(): WebSocketState {
         return this.status;
+    }
+
+    isConnected(): boolean {
+        return this.socket?.readyState === WebSocket.OPEN;
     }
 
     connect(): Promise<void> {
@@ -29,14 +33,14 @@ class WebSocketService {
         if (this.socket?.readyState === WebSocket.CONNECTING) {
             return new Promise((resolve, reject) => {
                 const unsubscribe = this.onStatus((status) => {
-                    if (status === 'CONNECTED') {
+                    if (status === "CONNECTED") {
                         unsubscribe();
                         resolve();
                     }
 
-                    if (status === 'ERROR' || status === 'DISCONNECTED') {
+                    if (status === "ERROR" || status === "DISCONNECTED") {
                         unsubscribe();
-                        reject(new Error('Không thể kết nối WebSocket'));
+                        reject(new Error("Không thể kết nối WebSocket."));
                     }
                 });
             });
@@ -45,62 +49,81 @@ class WebSocketService {
         return new Promise((resolve, reject) => {
             const ws = new WebSocket(this.url);
             this.socket = ws;
-
-            this.notifyStatus('CONNECTING');
+            this.notifyStatus("CONNECTING");
 
             ws.onopen = () => {
-                this.notifyStatus('CONNECTED');
+                if (this.socket !== ws) return;
+
+                this.notifyStatus("CONNECTED");
                 resolve();
             };
 
             ws.onmessage = (event: MessageEvent<string>) => {
                 try {
-                    const raw = JSON.parse(event.data);
+                    const raw: unknown = JSON.parse(event.data);
 
-                    const message = raw?.data?.event ? raw.data : raw;
-
-                    if (typeof message.event !== "string") {
-                        console.warn("WebSocket response không hợp lệ:", raw);
+                    if (typeof raw !== "object" || raw === null) {
                         return;
                     }
 
+                    const response = raw as Record<string, unknown>;
+
+                    const nestedData =
+                        typeof response.data === "object" &&
+                        response.data !== null ? response.data as Record<string, unknown> : null;
+
+                    const message =
+                        nestedData &&
+                        typeof nestedData.event === "string" ? nestedData : response;
+
+                    if (typeof message.event !== "string") {
+                        return;
+                    }
+
+                    const status = response.status ?? message.status;
+                    const mes = response.mes ?? message.mes;
+
                     this.notifyMessage({
                         event: message.event,
-                        status: raw.status ?? message.status,
+                        status: status === "success" || status === "error" ? status : undefined,
                         data: message.data,
-                        mes: raw.mes ?? message.mes,
+                        mes: typeof mes === "string" ? mes : undefined,
                     });
-                } catch (error) {
-                    console.error('Lỗi đọc WebSocket message:', error);
+                } catch {
+                    // Bỏ qua response không phải JSON hợp lệ.
                 }
             };
 
             ws.onerror = () => {
-                this.notifyStatus('ERROR');
-                reject(new Error('WebSocket connection error'));
+                if (this.socket !== ws) return;
+
+                this.notifyStatus("ERROR");
+                reject(new Error("Kết nối WebSocket thất bại."));
             };
 
             ws.onclose = () => {
-                this.notifyStatus('DISCONNECTED');
+                if (this.socket !== ws) return;
+
                 this.socket = null;
+                this.notifyStatus("DISCONNECTED");
             };
         });
     }
 
     send(event: string, data: unknown = {}): void {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            throw new Error('WebSocket chưa kết nối');
+        if (!this.isConnected()) {
+            throw new Error("WebSocket chưa kết nối.");
         }
 
         const request = {
-            action: 'onchat',
+            action: "onchat",
             data: {
                 event,
                 data,
             },
         };
 
-        this.socket.send(JSON.stringify(request));
+        this.socket!.send(JSON.stringify(request));
     }
 
     on(event: string, callback: MessageCallback): () => void {
@@ -110,29 +133,47 @@ class WebSocketService {
 
         this.messageListeners.get(event)!.add(callback);
 
-        return () => {this.messageListeners.get(event)?.delete(callback);};
+        return () => {
+            const listeners = this.messageListeners.get(event);
+
+            listeners?.delete(callback);
+
+            if (listeners?.size === 0) {
+                this.messageListeners.delete(event);
+            }
+        };
     }
 
     onStatus(callback: StatusCallback): () => void {
         this.statusListeners.add(callback);
 
-        return () => {this.statusListeners.delete(callback);};
+        return () => {
+            this.statusListeners.delete(callback);
+        };
     }
 
     private notifyMessage(message: WebSocketMessage): void {
-        this.messageListeners.get(message.event)?.forEach((callback) => {
-            callback(message);
-        });
+        this.messageListeners.get(message.event)?.forEach((callback) => callback(message));
     }
 
     private notifyStatus(status: WebSocketState): void {
         this.status = status;
-        this.statusListeners.forEach((callback) => callback(status));
+
+        this.statusListeners.forEach((callback) => {
+            callback(status);
+        });
     }
 
     disconnect(): void {
-        this.socket?.close();
+        const socket = this.socket;
+
         this.socket = null;
+
+        if (socket) {
+            socket.close();
+        }
+
+        this.notifyStatus("DISCONNECTED");
     }
 }
 

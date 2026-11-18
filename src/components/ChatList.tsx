@@ -3,6 +3,10 @@ import type { Chat } from "../types/chat";
 import { ChatItem } from "./ChatItem";
 import { userService } from "../services/userService";
 
+import { CreateRoomModal } from "./rooms/CreateRoomModal";
+import { JoinRoomModal } from "./rooms/JoinRoomModal";
+import type { Room } from "../services/roomService";
+
 type ChatListProps = {
   chats: Chat[];
   selectedId?: string;
@@ -11,6 +15,7 @@ type ChatListProps = {
   onQueryChange: (query: string) => void;
   onSearchUser: (username: string) => void;
   searchingUser: boolean;
+  onRoomReady: (room: Room) => void;
 };
 
 type SearchResult = {
@@ -19,9 +24,13 @@ type SearchResult = {
   error: string;
 };
 
-export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onSearchUser, searchingUser,}: ChatListProps) {
+export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onSearchUser, searchingUser, onRoomReady,}: ChatListProps) {
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [checkingKeyword, setCheckingKeyword] = useState("");
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [showJoinRoom, setShowJoinRoom] = useState(false);
+  const [showRoomMenu, setShowRoomMenu] = useState(false);
+
   const keyword = query.trim();
 
   // Các cuộc trò chuyện hiện có
@@ -40,8 +49,9 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
   );
 
   // Chỉ lấy kết quả tương ứng với từ khóa hiện tại.
-  const foundUser = searchResult?.keyword.toLowerCase() === keyword.toLowerCase() ? searchResult.username : null;
-  const searchError = searchResult?.keyword.toLowerCase() === keyword.toLowerCase() ? searchResult.error : "";
+  const currentSearchResult = searchResult?.keyword.toLowerCase() === keyword.toLowerCase() ? searchResult : null;
+  const foundUser = currentSearchResult?.username ?? null;
+  const searchError = currentSearchResult?.error ?? "";
 
   // Tìm kiếm tài khoản sau khi người dùng ngừng gõ 500ms.
   useEffect(() => {
@@ -52,6 +62,8 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
     let cancelled = false;
 
     const timeout = window.setTimeout(async () => {
+      if (cancelled) return;
+
       setCheckingKeyword(keyword);
 
       try {
@@ -65,13 +77,12 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
           error: exists ? "" : "Không tìm thấy tài khoản.",
         });
       } catch {
-        if (!cancelled) {
-          setSearchResult({
-            keyword,
-            username: null,
-            error: "Không thể tìm kiếm người dùng.",
-          });
-        }
+        if (cancelled) return;
+        setSearchResult({
+          keyword,
+          username: null,
+          error: "Không thể tìm kiếm người dùng.",
+        });
       } finally {
         if (!cancelled) {
           setCheckingKeyword("");
@@ -105,6 +116,18 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
     setSearchResult(null);
   };
 
+  // Tạo phòng.
+  const handleOpenCreateRoom = () => {
+    setShowRoomMenu(false);
+    setShowCreateRoom(true);
+  };
+
+  // Tham gia phòng.
+  const handleOpenJoinRoom = () => {
+    setShowRoomMenu(false);
+    setShowJoinRoom(true);
+  };
+
   return (
       <section className="chat-list-panel" aria-label="Danh sách cuộc trò chuyện">
         <header className="chat-list-header">
@@ -113,9 +136,36 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
               <h1>Tin nhắn</h1>
             </div>
 
-            <button className="compose-button" aria-label="Tạo tin nhắn mới">
-              +
-            </button>
+            <div className="compose-wrapper">
+              <button type="button" className="compose-button" aria-label="Tạo hoặc tham gia phòng" aria-expanded={showRoomMenu}
+                  onClick={() =>
+                      setShowRoomMenu((prev) => !prev)
+                  }>
+                +
+              </button>
+
+              {showRoomMenu && (
+                  <div className="room-action-menu">
+                    <button type="button" onClick={handleOpenCreateRoom}>
+                      <span>+</span>
+
+                      <span>
+                        <strong>Tạo phòng mới</strong>
+                        <small>Tạo nhóm chat mới</small>
+                      </span>
+                    </button>
+
+                    <button type="button" onClick={handleOpenJoinRoom}>
+                      <span>/</span>
+
+                      <span>
+                        <strong>Tham gia phòng</strong>
+                        <small>Tham gia phòng đã có</small>
+                      </span>
+                    </button>
+                  </div>
+              )}
+            </div>
           </div>
 
           <label className="search-box">
@@ -124,8 +174,7 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
               <path d="m16 16 4 4" />
             </svg>
 
-            <input
-                type="text" value={query}
+            <input type="text" value={query}
                 onChange={(event) =>
                     onQueryChange(event.target.value)
                 }
@@ -185,6 +234,20 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
               </div>
           )}
         </div>
+
+        {showCreateRoom && (
+            <CreateRoomModal
+                onClose={() => setShowCreateRoom(false)}
+                onSuccess={onRoomReady}
+            />
+        )}
+
+        {showJoinRoom && (
+            <JoinRoomModal
+                onClose={() => setShowJoinRoom(false)}
+                onSuccess={onRoomReady}
+            />
+        )}
       </section>
   );
 }

@@ -640,3 +640,225 @@ button { color: inherit; }
   color: #888;
   text-transform: uppercase;
 }
+
+.compose-wrapper {
+  position: relative;
+}
+
+.room-action-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+
+  z-index: 1000;
+
+  width: 230px;
+  padding: 8px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
+}
+
+.room-action-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.room-action-menu button:hover {
+  background: #f1f5f9;
+}
+
+.room-action-menu button > span:first-child {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #6366f1;
+  font-size: 18px;
+}
+
+.room-action-menu button > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-action-menu strong {
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.room-action-menu small {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.room-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+  box-sizing: border-box;
+
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.room-modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+
+  padding: 26px;
+  box-sizing: border-box;
+
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.room-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.room-modal-header h2 {
+  margin: 0 0 8px;
+  color: #1f2937;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.room-modal-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.room-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  width: 32px;
+  height: 32px;
+
+  border: none;
+  border-radius: 8px;
+  background: #f3f4f6;
+
+  color: #4b5563;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.room-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.room-modal form label {
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.room-modal form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  box-sizing: border-box;
+
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+
+  font-size: 14px;
+}
+
+.room-modal form input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.room-form-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.room-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.room-button-secondary,
+.room-button-primary {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.room-button-secondary {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.room-button-primary {
+  border: none;
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.room-button-primary:hover {
+  background: #4f46e5;
+}
+
+.room-button-primary:disabled,
+.room-button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
