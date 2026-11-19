@@ -24,7 +24,7 @@ export interface Room {
     chatMess: RoomMessage[];
 }
 
-type RoomEvent = "CREATE_ROOM" | "JOIN_ROOM";
+type RoomEvent = "CREATE_ROOM" | "JOIN_ROOM" | "OUT_ROOM";
 
 const RESPONSE_TIMEOUT = 10000;
 
@@ -151,6 +151,69 @@ function requestRoom(event: RoomEvent, name: string): Promise<Room> {
     });
 }
 
+function requestLeaveRoom(name: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let completed = false;
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        let unsubscribe = () => {};
+
+        const cleanup = () => {
+            if (timeout !== undefined) {
+                clearTimeout(timeout);
+                timeout = undefined;
+            }
+
+            unsubscribe();
+        };
+
+        const finish = (callback: () => void) => {
+            if (completed) return;
+
+            completed = true;
+            cleanup();
+            callback();
+        };
+
+        const handleResponse = (message: WebSocketMessage) => {
+            finish(() => {
+                if (message.status === "success") {
+                    resolve();
+                } else {
+                    reject(new Error(message.mes || "Không thể rời phòng chat."));
+                }
+            });
+        };
+
+        try {
+            const roomName = name.trim();
+
+            if (!roomName) {
+                throw new Error("Tên phòng không được để trống.");
+            }
+
+            if (!websocketService.isConnected()) {
+                throw new Error("WebSocket chưa kết nối. Vui lòng thử lại.");
+            }
+
+            unsubscribe = websocketService.on("OUT_ROOM", handleResponse);
+
+            timeout = setTimeout(() => {
+                finish(() => {
+                    reject(new Error("Máy chủ không phản hồi. Vui lòng thử lại."));
+                });
+            }, RESPONSE_TIMEOUT);
+
+            websocketService.send("OUT_ROOM", {
+                name: roomName,
+            });
+        } catch (error) {
+            finish(() => {
+                reject(error instanceof Error ? error : new Error("Không thể gửi yêu cầu rời phòng."));
+            });
+        }
+    });
+}
+
 export const roomService = {
     createRoom(name: string): Promise<Room> {
         return requestRoom("CREATE_ROOM", name);
@@ -158,5 +221,9 @@ export const roomService = {
 
     joinRoom(name: string): Promise<Room> {
         return requestRoom("JOIN_ROOM", name);
+    },
+
+    leaveRoom(name: string): Promise<void> {
+        return requestLeaveRoom(name);
     },
 };
