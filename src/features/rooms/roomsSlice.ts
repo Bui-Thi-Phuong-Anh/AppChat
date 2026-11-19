@@ -1,6 +1,12 @@
 import {createAsyncThunk, createSlice, type PayloadAction,} from "@reduxjs/toolkit";
-import type { Room } from "../../services/roomService";
+import type {Room, RoomMember,} from "../../services/roomService";
 import { roomService } from "../../services/roomService";
+
+interface RoomDebugInfo {
+    name: string;
+    own: string | number | null;
+    members: RoomMember[];
+}
 
 interface RoomsState {
     rooms: Room[];
@@ -10,6 +16,8 @@ interface RoomsState {
     leaving: boolean;
     error: string | null;
     selectedRoomId: string | null;
+    lastLeaveRoomName: string | null;
+    roomDebugInfo: RoomDebugInfo | null;
 }
 
 const initialState: RoomsState = {
@@ -20,13 +28,15 @@ const initialState: RoomsState = {
     leaving: false,
     error: null,
     selectedRoomId: null,
+    lastLeaveRoomName: null,
+    roomDebugInfo: null,
 };
 
 type ThunkConfig = {
     rejectValue: string;
 };
 
-// Tạo phòng
+// CREATE_ROOM
 export const createRoomThunk = createAsyncThunk<Room, string, ThunkConfig>(
     "rooms/createRoom",
     async (name, { rejectWithValue }) => {
@@ -44,7 +54,7 @@ export const createRoomThunk = createAsyncThunk<Room, string, ThunkConfig>(
     }
 );
 
-// Tham gia phòng
+// JOIN_ROOM
 export const joinRoomThunk = createAsyncThunk<Room, string, ThunkConfig>(
     "rooms/joinRoom",
     async (name, { rejectWithValue }) => {
@@ -62,7 +72,7 @@ export const joinRoomThunk = createAsyncThunk<Room, string, ThunkConfig>(
     }
 );
 
-// Rời phòng
+// OUT_ROOM
 export const leaveRoomThunk = createAsyncThunk<string, string, ThunkConfig>(
     "rooms/leaveRoom",
     async (name, { rejectWithValue }) => {
@@ -82,7 +92,7 @@ export const leaveRoomThunk = createAsyncThunk<string, string, ThunkConfig>(
     }
 );
 
-// Thêm hoặc cập nhật phòng, tránh trùng tên
+// lưu nhóm
 function saveRoom(state: RoomsState, room: Room) {
     const index = state.rooms.findIndex((item) => item.name.toLowerCase() === room.name.toLowerCase());
 
@@ -108,9 +118,17 @@ const roomsSlice = createSlice({
             saveRoom(state, action.payload);
         },
 
-        setSelectedRoomId(state, action: PayloadAction<string | null>) {
-            state.selectedRoomId = action.payload;
-        },
+        setSelectedRoomId(
+            state,
+            action: PayloadAction<string | null>) {
+                state.selectedRoomId = action.payload;
+            },
+
+        setRoomDebugInfo(
+            state,
+            action: PayloadAction<RoomDebugInfo>) {
+                state.roomDebugInfo = action.payload;
+            },
 
         clearRoomsError(state) {
             state.error = null;
@@ -124,6 +142,8 @@ const roomsSlice = createSlice({
             state.creating = false;
             state.joining = false;
             state.leaving = false;
+            state.lastLeaveRoomName = null;
+            state.roomDebugInfo = null;
         },
     },
 
@@ -158,12 +178,14 @@ const roomsSlice = createSlice({
             })
 
             // OUT_ROOM
-            .addCase(leaveRoomThunk.pending, (state) => {
+            .addCase(leaveRoomThunk.pending, (state, action) => {
                 state.leaving = true;
                 state.error = null;
+                state.lastLeaveRoomName = action.meta.arg.trim();
             })
             .addCase(leaveRoomThunk.fulfilled, (state, action) => {
                 state.leaving = false;
+                state.error = null;
 
                 const roomName = action.payload.toLowerCase();
 
@@ -172,6 +194,8 @@ const roomsSlice = createSlice({
                 if (state.selectedRoomId?.toLowerCase() === roomName) {
                     state.selectedRoomId = null;
                 }
+
+                state.roomDebugInfo = null;
             })
             .addCase(leaveRoomThunk.rejected, (state, action) => {
                 state.leaving = false;
@@ -184,6 +208,7 @@ export const {
     setRooms,
     addRoom,
     setSelectedRoomId,
+    setRoomDebugInfo,
     clearRoomsError,
     clearRooms,
 } = roomsSlice.actions;

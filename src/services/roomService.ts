@@ -1,4 +1,3 @@
-
 import {type WebSocketMessage, websocketService,} from "./websocket";
 
 export interface RoomMember {
@@ -24,7 +23,7 @@ export interface Room {
     chatMess: RoomMessage[];
 }
 
-type RoomEvent = "CREATE_ROOM" | "JOIN_ROOM" | "OUT_ROOM";
+type RoomEvent = "CREATE_ROOM" | "JOIN_ROOM" | "GET_ROOM_CHAT_MES";
 
 const RESPONSE_TIMEOUT = 10000;
 
@@ -61,18 +60,26 @@ function normalizeRoom(payload: unknown): Room {
     }
 
     return {
-        ...(typeof data.id === "number" ||
-        typeof data.id === "string" ? { id: data.id } : {}),
+        ...(typeof data.id === "number" || typeof data.id === "string" ? { id: data.id } : {}),
+
         name: data.name,
-        ...(typeof data.own === "string" ||
-        typeof data.own === "number" ? { own: data.own } : {}),
+
+        ...(typeof data.own === "string" || typeof data.own === "number" ? { own: data.own } : {}),
+
         ...(typeof data.createTime === "string" ? { createTime: data.createTime } : {}),
-        user: user as RoomMember[],
+
+        user: user.filter(
+            (member): member is RoomMember =>
+                isObject(member) &&
+                (typeof member.id === "number") &&
+                typeof member.name === "string"
+        ),
+
         chatMess: Array.isArray(chatMess) ? chatMess as RoomMessage[] : [],
     };
 }
 
-function requestRoom(event: RoomEvent, name: string): Promise<Room> {
+function requestRoom(event: RoomEvent, name: string, page: number = 1): Promise<Room> {
     return new Promise((resolve, reject) => {
         let completed = false;
         let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -140,9 +147,8 @@ function requestRoom(event: RoomEvent, name: string): Promise<Room> {
                 });
             }, RESPONSE_TIMEOUT);
 
-            websocketService.send(event, {
-                name: roomName,
-            });
+            websocketService.send(event, event === "GET_ROOM_CHAT_MES" ? {name: roomName, page,} : {name: roomName,});
+
         } catch (error) {
             finish(() => {
                 reject(error instanceof Error ? error : new Error("Không thể gửi yêu cầu WebSocket."));
@@ -175,6 +181,8 @@ function requestLeaveRoom(name: string): Promise<void> {
         };
 
         const handleResponse = (message: WebSocketMessage) => {
+            console.log("[OUT_ROOM] Server response:", message);
+
             finish(() => {
                 if (message.status === "success") {
                     resolve();
@@ -225,5 +233,9 @@ export const roomService = {
 
     leaveRoom(name: string): Promise<void> {
         return requestLeaveRoom(name);
+    },
+
+    getRoomChat(name: string, page: number = 1): Promise<Room> {
+        return requestRoom("GET_ROOM_CHAT_MES", name, page);
     },
 };
