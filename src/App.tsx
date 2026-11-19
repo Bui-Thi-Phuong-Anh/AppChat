@@ -33,6 +33,30 @@ function mapUserToContact(item: UserListItem, type: "friend" | "group"): Contact
     };
 }
 
+function parseChatTimestamp(value: string): Date {
+    const localDateTime = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (localDateTime) {
+        const [, year, month, day, hour, minute, second = "0"] = localDateTime;
+        return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+    }
+    return new Date(value);
+}
+
+function formatChatTimestamp(value: string): string {
+    const date = parseChatTimestamp(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const today = new Date();
+    const dayNumber = (item: Date) => Date.UTC(item.getFullYear(), item.getMonth(), item.getDate());
+    const daysAgo = Math.floor((dayNumber(today) - dayNumber(date)) / 86_400_000);
+
+    if (daysAgo <= 0) {
+        return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    }
+    if (daysAgo === 1) return "Hôm qua";
+    return `${daysAgo} ngày trước`;
+}
+
 function mapContactToChat(contact: ContactEntry, kind: "people" | "group"): Chat {
     return {
         id: contact.id,
@@ -233,9 +257,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                     lastMessage: latestMessage ? `${
                         latestMessage.senderId === currentUserId ? "Bạn: " : ""
                     }${latestMessage.content}` : "",
-                    time: latestMessage ? new Date(latestMessage.createdAt).toLocaleTimeString("vi-VN", {
-                        hour: "2-digit", minute: "2-digit",
-                    }) : "",
+                    time: latestMessage ? formatChatTimestamp(latestMessage.createdAt) : "",
                 };
             })
             .filter((chat) =>
