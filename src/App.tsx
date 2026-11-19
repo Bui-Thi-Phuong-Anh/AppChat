@@ -428,6 +428,10 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                             chat={selectedChat}
                             currentUserId={currentUserId}
                             onMessageSent={refreshUserList}
+                            onRoomLeft={() => {
+                                setSelectedChat(null);
+                                void refreshUserList();
+                            }}
                         />
                     </section>
                 </>
