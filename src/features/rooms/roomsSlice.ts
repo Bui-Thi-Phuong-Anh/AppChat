@@ -108,6 +108,17 @@ const roomsSlice = createSlice({
             saveRoom(state, action.payload);
         },
 
+        updateRoomDetails(state, action: PayloadAction<Room>) {
+            const index = state.rooms.findIndex(
+                (room) => room.name.toLowerCase() === action.payload.name.toLowerCase(),
+            );
+            if (index >= 0) {
+                state.rooms[index] = { ...state.rooms[index], ...action.payload };
+            } else {
+                state.rooms.push(action.payload);
+            }
+        },
+
         setSelectedRoomId(state, action: PayloadAction<string | null>) {
             state.selectedRoomId = action.payload;
         },
@@ -183,6 +194,7 @@ const roomsSlice = createSlice({
 export const {
     setRooms,
     addRoom,
+    updateRoomDetails,
     setSelectedRoomId,
     clearRoomsError,
     clearRooms,

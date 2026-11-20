@@ -15,7 +15,7 @@ import type { UserListItem } from "./services/contactService";
 import { userService } from "./services/userService";
 import { websocketService } from "./services/websocket";
 import {setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
-import {addMessage, fetchPeopleChatHistory,} from "./features/messages/messagesSlice";
+import {addMessage, fetchPeopleChatHistory, fetchRoomChatHistory, replaceMessage,} from "./features/messages/messagesSlice";
 import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
 import type { ContactEntry } from "./types/contact";
@@ -150,6 +150,45 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                 }
 
                 // Bỏ qua tin nhắn do tài khoản hiện tại gửi
+                const isRoomMessage = data.type === 1 || data.type === "1" || data.type === "room";
+                const state = store.getState();
+                const roomName = [...state.contacts.groups, ...state.rooms.rooms]
+                    .find((room) => room.name.trim().toLowerCase() === data.to!.trim().toLowerCase())?.name;
+
+                const isKnownRoomTarget = roomName && data.to.trim().toLowerCase() !== currentUserId.trim().toLowerCase();
+                if (isRoomMessage || isKnownRoomTarget) {
+                    const targetRoomName = roomName ?? data.to.trim();
+                    const chatId = targetRoomName;
+                    const createdAt = data.createAt ?? new Date().toISOString();
+                    const senderIsCurrentUser = data.name.trim().toLowerCase() === currentUserId.trim().toLowerCase();
+                    const optimistic = senderIsCurrentUser
+                        ? state.messages.messages.find((item) =>
+                            item.chatId.toLowerCase() === chatId.toLowerCase() &&
+                            item.senderId.trim().toLowerCase() === currentUserId.trim().toLowerCase() &&
+                            item.content === data.mes && item.type === 1 && Boolean(item.orderAt),
+                        )
+                        : undefined;
+                    const confirmedMessage = {
+                        id: String(data.id ?? optimistic?.id ?? crypto.randomUUID()),
+                        chatId,
+                        senderId: data.name,
+                        senderName: data.name,
+                        recipientId: targetRoomName,
+                        recipientName: targetRoomName,
+                        content: data.mes,
+                        createdAt,
+                        orderAt: optimistic?.orderAt ?? createdAt,
+                        type: 1,
+                    };
+
+                    if (optimistic) {
+                        dispatch(replaceMessage({ id: optimistic.id, message: confirmedMessage }));
+                    } else {
+                        dispatch(addMessage(confirmedMessage));
+                    }
+                    return;
+                }
+
                 if (data.name.trim().toLowerCase() === currentUserId.trim().toLowerCase()) {
                     return;
                 }
@@ -183,7 +222,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
         );
 
         return unsubscribe;
-    }, [currentUserId, dispatch, friends]);
+    }, [currentUserId, dispatch, friends, store]);
 
     // Tải lịch sử tin nhắn 1-1 khi danh sách bạn bè được cập nhật
     useEffect(() => {
@@ -197,6 +236,17 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
             );
         });
     }, [dispatch, friends]);
+
+    // Tải tin nhắn mới nhất của các nhóm để hiện nội dung và thời gian trong danh sách chat.
+    useEffect(() => {
+        groups.forEach((group) => {
+            void dispatch(fetchRoomChatHistory({
+                roomName: group.name,
+                chatId: group.id,
+                page: 1,
+            }));
+        });
+    }, [dispatch, groups]);
 
     // Gộp danh sách bạn bè và nhóm
     const chats = useMemo(() => {

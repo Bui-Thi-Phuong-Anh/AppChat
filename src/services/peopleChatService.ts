@@ -26,7 +26,7 @@ const RESPONSE_TIMEOUT_MS = 10_000;
 
 class SendConfirmationMissingError extends Error {}
 
-async function ensureAuthenticatedConnection(): Promise<void> {
+export async function ensureAuthenticatedConnection(): Promise<void> {
   const wasConnected = websocketService.getStatus() === "CONNECTED";
   await websocketService.connect();
   if (wasConnected) return;

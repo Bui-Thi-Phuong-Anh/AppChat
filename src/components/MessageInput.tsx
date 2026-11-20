@@ -2,15 +2,17 @@ import { type FormEvent, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { addMessage, removeMessage, replaceMessage } from "../features/messages/messagesSlice";
 import { peopleChatService } from "../services/peopleChatService";
+import { roomService } from "../services/roomService";
 import type { AppDispatch, RootState } from "../store/store";
 
 type MessageInputProps = {
   chatId: string;
   currentUserId: string;
+  isPeopleChat: boolean;
   onMessageSent?: () => void;
 };
 
-export default function MessageInput({ chatId, currentUserId, onMessageSent }: MessageInputProps) {
+export default function MessageInput({ chatId, currentUserId, isPeopleChat, onMessageSent }: MessageInputProps) {
   const [content, setContent] = useState("");
   const dispatch = useDispatch<AppDispatch>();
   const messages = useSelector((state: RootState) => state.messages.messages);
@@ -36,16 +38,13 @@ export default function MessageInput({ chatId, currentUserId, onMessageSent }: M
       content: trimmedContent,
       createdAt: sentAt,
       orderAt: sentAt,
-      type: 0,
+      type: isPeopleChat ? 0 : 1,
     }));
 
     try {
-      const sentMessage = await peopleChatService.sendMessage(
-        currentUserId,
-        chatId,
-        trimmedContent,
-        knownMessageIds,
-      );
+      const sentMessage = isPeopleChat
+        ? await peopleChatService.sendMessage(currentUserId, chatId, trimmedContent, knownMessageIds)
+        : await roomService.sendRoomMessage(currentUserId, chatId, trimmedContent, knownMessageIds);
       if (sentMessage) {
         dispatch(replaceMessage({
           id: optimisticId,

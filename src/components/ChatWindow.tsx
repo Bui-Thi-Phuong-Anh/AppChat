@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchPeopleChatHistory } from "../features/messages/messagesSlice";
+import { fetchPeopleChatHistory, fetchRoomChatHistory } from "../features/messages/messagesSlice";
 import type { AppDispatch } from "../store/store";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
@@ -18,6 +18,9 @@ type ChatWindowProps = {
 export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLeft,}: ChatWindowProps) {
     const dispatch = useDispatch<AppDispatch>();
     const leaving = useSelector((state: RootState) => state.rooms.leaving);
+    const chatId = chat?.id;
+    const chatKind = chat?.kind;
+    const chatName = chat?.name;
 
     const handleLeaveRoom = async () => {
         if (!chat || chat.kind !== "group" || leaving) return;
@@ -35,10 +38,13 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
 
     // Tải lịch sử tin nhắn cá nhân.
     useEffect(() => {
-        if (!chat || chat.kind !== "people") return;
-
-        void dispatch(fetchPeopleChatHistory({username: chat.name, chatId: chat.id, page: 1,}));
-    }, [chat?.id, chat?.kind, chat?.name, dispatch]);
+        if (!chatId || !chatName) return;
+        if (chatKind === "people") {
+            void dispatch(fetchPeopleChatHistory({ username: chatName, chatId, page: 1 }));
+        } else {
+            void dispatch(fetchRoomChatHistory({ roomName: chatName, chatId, page: 1 }));
+        }
+    }, [chatId, chatKind, chatName, dispatch]);
 
     if (!chat) {
         return (
@@ -80,6 +86,7 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
                 currentUserId={currentUserId}
                 username={chat.name}
                 isPeopleChat={isPeopleChat}
+                isRoomChat={!isPeopleChat}
             />
 
             <MessageInput
