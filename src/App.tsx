@@ -14,7 +14,7 @@ import { contactService } from "./services/contactService";
 import type { UserListItem } from "./services/contactService";
 import { userService } from "./services/userService";
 import { websocketService } from "./services/websocket";
-import {setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
+import {setContactOnline, setContactsError, setContactsLoading, setFriends, setGroups,} from "./features/contacts/contactsSlice";
 import {addMessage, fetchPeopleChatHistory, fetchRoomChatHistory, replaceMessage,} from "./features/messages/messagesSlice";
 import type { AppDispatch, RootState } from "./store/store";
 import type { Chat } from "./types/chat";
@@ -89,6 +89,8 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     const groups = useSelector(
         (state: RootState) => state.contacts.groups
     );
+
+    const friendNames = friends.map((friend) => friend.name).join("\u0000");
 
     const messages = useSelector(
         (state: RootState) => state.messages.messages
@@ -248,6 +250,46 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
         });
     }, [dispatch, groups]);
 
+    // Cập nhật trạng thái trực tuyến của bạn bè và làm mới định kỳ.
+    useEffect(() => {
+        const usernames = friendNames ? friendNames.split("\u0000") : [];
+        if (usernames.length === 0) return;
+
+        let cancelled = false;
+        let checking = false;
+        const refreshOnlineStatuses = async () => {
+            if (checking) return;
+            checking = true;
+            try {
+                for (const username of usernames) {
+                    if (cancelled) break;
+                    try {
+                        const online = await userService.checkUserOnline(username);
+                        if (!cancelled) dispatch(setContactOnline({ id: username, online }));
+                    } catch {
+                        // Giữ trạng thái gần nhất nếu máy chủ tạm thời không phản hồi.
+                    }
+                }
+            } finally {
+                checking = false;
+            }
+        };
+
+        void refreshOnlineStatuses();
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === "visible") void refreshOnlineStatuses();
+        };
+        const intervalId = window.setInterval(() => void refreshOnlineStatuses(), 15_000);
+        window.addEventListener("focus", refreshWhenVisible);
+        document.addEventListener("visibilitychange", refreshWhenVisible);
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+            window.removeEventListener("focus", refreshWhenVisible);
+            document.removeEventListener("visibilitychange", refreshWhenVisible);
+        };
+    }, [dispatch, friendNames]);
+
     // Gộp danh sách bạn bè và nhóm
     const chats = useMemo(() => {
         const contactChats: Chat[] = [
@@ -261,6 +303,10 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
 
         return contactChats;
     }, [friends, groups, selectedChat]);
+
+    const activeChat = selectedChat
+        ? chats.find((chat) => chat.id.toLowerCase() === selectedChat.id.toLowerCase()) ?? selectedChat
+        : null;
 
     // Xử lý sau khi tạo phòng hoặc tham gia phòng thành công
     const handleRoomReady = async (room: Room) => {
@@ -475,7 +521,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
 
                     <section className="conversation-panel" aria-label="Nội dung cuộc trò chuyện">
                         <ChatWindow
-                            chat={selectedChat}
+                            chat={activeChat}
                             currentUserId={currentUserId}
                             onMessageSent={refreshUserList}
                             onRoomLeft={() => {

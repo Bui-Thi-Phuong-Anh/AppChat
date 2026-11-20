@@ -65,12 +65,13 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
             <header className="chat-window-header">
                 <div className="chat-avatar" style={{ backgroundColor: chat.avatarColor }}>
                     {chat.avatar}
+                    {isPeopleChat && chat.online && <i className="online-dot" aria-label="Trực tuyến" />}
                 </div>
 
                 <div className="chat-header-info">
                     <h2>{chat.name}</h2>
                     <span>
-                        {isPeopleChat ? chat.online ? "Đang hoạt động" : "Ngoại tuyến" : "Phòng chat"}
+                        {isPeopleChat ? chat.online === undefined ? "Đang kiểm tra trạng thái..." : chat.online ? "Đang hoạt động" : "Ngoại tuyến" : "Phòng chat"}
                     </span>
                 </div>
 
