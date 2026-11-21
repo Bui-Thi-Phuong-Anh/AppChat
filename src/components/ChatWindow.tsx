@@ -59,7 +59,7 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
 
         let cancelled = false;
 
-        roomService.getRoomChat(chat.name, 1)
+        roomService.getRoomHistory(chat.name, 1)
             .then((room) => {
                 if (cancelled) return;
                 setMembers(room.user);
