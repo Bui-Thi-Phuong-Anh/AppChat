@@ -72,8 +72,7 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
         return () => {
             cancelled = true;
         };
-    }, [chat?.id, chat?.kind, chat?.name]);
-
+    }, [chat]);
 
     if (!chat) {
         return (
@@ -154,6 +153,7 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
                 currentUserId={currentUserId}
                 username={chat.name}
                 isPeopleChat={isPeopleChat}
+                isRoomChat={chat.kind === "group"}
             />
 
             <MessageInput
