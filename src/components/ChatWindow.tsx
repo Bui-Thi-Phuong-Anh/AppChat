@@ -1,12 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchPeopleChatHistory, fetchRoomChatHistory } from "../features/messages/messagesSlice";
-import type { AppDispatch } from "../store/store";
+import { leaveRoomThunk } from "../features/rooms/roomsSlice";
+import type { AppDispatch, RootState } from "../store/store";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import type { Chat } from "../types/chat";
-import type { RootState } from "../store/store";
-import { leaveRoomThunk } from "../features/rooms/roomsSlice";
+import {roomService,type RoomMember,} from "../services/roomService";
 
 type ChatWindowProps = {
     chat: Chat | null;
@@ -17,34 +16,63 @@ type ChatWindowProps = {
 
 export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLeft,}: ChatWindowProps) {
     const dispatch = useDispatch<AppDispatch>();
-    const leaving = useSelector((state: RootState) => state.rooms.leaving);
-    const chatId = chat?.id;
-    const chatKind = chat?.kind;
-    const chatName = chat?.name;
 
+    const leaving = useSelector(
+        (state: RootState) => state.rooms.leaving
+    );
+
+    const roomError = useSelector(
+        (state: RootState) => state.rooms.error
+    );
+
+    const [members, setMembers] = useState<RoomMember[]>([]);
+    const [showMembers, setShowMembers] = useState(false);
+
+    // Rời phòng
     const handleLeaveRoom = async () => {
-        if (!chat || chat.kind !== "group" || leaving) return;
+        if (!chat || chat.kind !== "group" || leaving) {
+            return;
+        }
 
-        const confirmed = window.confirm(`Bạn có chắc chắn muốn rời phòng "${chat.name}" không?`);
+        const confirmed = window.confirm(
+            `Bạn có chắc chắn muốn rời phòng "${chat.name}" không?`
+        );
 
         if (!confirmed) return;
 
-        const result = await dispatch(leaveRoomThunk(chat.name));
+        const result = await dispatch(
+            leaveRoomThunk(chat.name)
+        );
 
         if (leaveRoomThunk.fulfilled.match(result)) {
+            setMembers([]);
+            setShowMembers(false);
             onRoomLeft?.();
         }
     };
 
-    // Tải lịch sử tin nhắn cá nhân.
+    // Lấy danh sách thành viên
     useEffect(() => {
-        if (!chatId || !chatName) return;
-        if (chatKind === "people") {
-            void dispatch(fetchPeopleChatHistory({ username: chatName, chatId, page: 1 }));
-        } else {
-            void dispatch(fetchRoomChatHistory({ roomName: chatName, chatId, page: 1 }));
+        if (!chat || chat.kind !== "group") {
+            return;
         }
-    }, [chatId, chatKind, chatName, dispatch]);
+
+        let cancelled = false;
+
+        roomService.getRoomChat(chat.name, 1)
+            .then((room) => {
+                if (cancelled) return;
+                setMembers(room.user);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setMembers([]);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [chat]);
 
     if (!chat) {
         return (
@@ -65,29 +93,67 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
             <header className="chat-window-header">
                 <div className="chat-avatar" style={{ backgroundColor: chat.avatarColor }}>
                     {chat.avatar}
-                    {isPeopleChat && chat.online && <i className="online-dot" aria-label="Trực tuyến" />}
                 </div>
 
                 <div className="chat-header-info">
                     <h2>{chat.name}</h2>
                     <span>
-                        {isPeopleChat ? chat.online === undefined ? "Đang kiểm tra trạng thái..." : chat.online ? "Đang hoạt động" : "Ngoại tuyến" : "Phòng chat"}
+                        {isPeopleChat ? chat.online ? "Đang hoạt động" : "Ngoại tuyến" : `Phòng chat`}
                     </span>
                 </div>
 
                 {chat.kind === "group" && (
-                    <button type="button" className="leave-room-header-button" onClick={handleLeaveRoom} disabled={leaving}>
-                        {leaving ? "Đang rời..." : "Rời phòng"}
-                    </button>
+                    <div className="chat-header-actions">
+                        <button type="button" className="show-members-button" onClick={() => setShowMembers((prev) => !prev)}>
+                            <i className="bi bi-people"></i>
+                            Thành viên ({members.length})
+                        </button>
+
+                        <button type="button" className="leave-room-header-button" onClick={handleLeaveRoom} disabled={leaving}>
+                            {leaving ? "Đang rời..." : "Rời phòng"}
+                        </button>
+                    </div>
                 )}
             </header>
+
+            {chat.kind === "group" && roomError && (
+                <div className="room-error-message" role="alert">
+                    {roomError}
+                </div>
+            )}
+
+            {chat.kind === "group" && showMembers && (
+                <div className="room-members-panel">
+                    <div className="room-members-panel-header">
+                        <h3>Thành viên ({members.length})</h3>
+
+                        <button type="button" onClick={() => setShowMembers(false)}>
+                            x
+                        </button>
+                    </div>
+
+                    {members.length > 0 ? (
+                        members.map((member) => (
+                            <div className="room-member-item" key={member.id}>
+                                <div className="room-member-avatar">
+                                    {member.name.charAt(0).toUpperCase()}
+                                </div>
+
+                                <span>{member.name}</span>
+                            </div>
+                        ))
+                    ) : (
+                        <p>Chưa có thông tin thành viên.</p>
+                    )}
+                </div>
+            )}
 
             <MessageList
                 chatId={chat.id}
                 currentUserId={currentUserId}
                 username={chat.name}
                 isPeopleChat={isPeopleChat}
-                isRoomChat={!isPeopleChat}
+                isRoomChat={chat.kind === "group"}
             />
 
             <MessageInput
