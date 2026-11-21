@@ -345,22 +345,32 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                 const latestMessage = messages
                     .filter((message) => message.chatId === chat.id)
                     .sort((a, b) =>
-                            new Date(b.orderAt ?? b.createdAt).getTime() - new Date(a.orderAt ?? a.createdAt).getTime()
+                            parseChatTimestamp(b.orderAt ?? b.createdAt).getTime() - parseChatTimestamp(a.orderAt ?? a.createdAt).getTime()
                     )[0];
+                const latestTimestamp = latestMessage
+                    ? parseChatTimestamp(latestMessage.orderAt ?? latestMessage.createdAt).getTime()
+                    : Number.NEGATIVE_INFINITY;
 
                 return {
-                    ...chat,
-                    lastMessage: latestMessage ? `${
-                        latestMessage.senderId === currentUserId ? "Bạn: " : ""
-                    }${latestMessage.content}` : "",
-                    time: latestMessage ? formatChatTimestamp(latestMessage.createdAt) : "",
+                    chat: {
+                        ...chat,
+                        lastMessage: latestMessage ? `${
+                        chat.kind === "group"
+                            ? `${latestMessage.senderName ?? latestMessage.senderId}: `
+                            : latestMessage.senderId === currentUserId ? "Bạn: " : ""
+                        }${latestMessage.content}` : "",
+                        time: latestMessage ? formatChatTimestamp(latestMessage.orderAt ?? latestMessage.createdAt) : "",
+                    },
+                    latestTimestamp: Number.isNaN(latestTimestamp) ? Number.NEGATIVE_INFINITY : latestTimestamp,
                 };
             })
-            .filter((chat) =>
+            .filter(({ chat }) =>
                 chat.name
                     .toLocaleLowerCase()
                     .includes(query.trim().toLocaleLowerCase())
-            );
+            )
+            .sort((a, b) => b.latestTimestamp - a.latestTimestamp)
+            .map(({ chat }) => chat);
     }, [chats, messages, currentUserId, query]);
 
     // Đăng xuất
@@ -487,6 +497,12 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
         }
     };
 
+    const handleSelectContact = (contact: ContactEntry, isGroup: boolean) => {
+        setSelectedChat(mapContactToChat(contact, isGroup ? "group" : "people"));
+        setActiveSection("Tin nhắn");
+        setQuery("");
+    };
+
     return (
         <main
             className={`app-shell ${
@@ -506,7 +522,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                 onLogout={handleLogout}
             />
 
-            {activeSection === "Danh bạ" ? (<ContactDirectory />) : (
+            {activeSection === "Danh bạ" ? (<ContactDirectory onSelectContact={handleSelectContact} />) : (
                 <>
                     <ChatList
                         chats={filteredChats}
