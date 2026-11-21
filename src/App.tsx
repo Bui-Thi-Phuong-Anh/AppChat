@@ -355,7 +355,9 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                     chat: {
                         ...chat,
                         lastMessage: latestMessage ? `${
-                        latestMessage.senderId === currentUserId ? "Bạn: " : ""
+                        chat.kind === "group"
+                            ? `${latestMessage.senderName ?? latestMessage.senderId}: `
+                            : latestMessage.senderId === currentUserId ? "Bạn: " : ""
                         }${latestMessage.content}` : "",
                         time: latestMessage ? formatChatTimestamp(latestMessage.orderAt ?? latestMessage.createdAt) : "",
                     },
@@ -495,6 +497,12 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
         }
     };
 
+    const handleSelectContact = (contact: ContactEntry, isGroup: boolean) => {
+        setSelectedChat(mapContactToChat(contact, isGroup ? "group" : "people"));
+        setActiveSection("Tin nhắn");
+        setQuery("");
+    };
+
     return (
         <main
             className={`app-shell ${
@@ -514,7 +522,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                 onLogout={handleLogout}
             />
 
-            {activeSection === "Danh bạ" ? (<ContactDirectory />) : (
+            {activeSection === "Danh bạ" ? (<ContactDirectory onSelectContact={handleSelectContact} />) : (
                 <>
                     <ChatList
                         chats={filteredChats}
