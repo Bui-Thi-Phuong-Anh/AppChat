@@ -18,12 +18,16 @@ function parseOnlineStatus(value: unknown): boolean | undefined {
 function readOnlineStatus(data: unknown): boolean {
     if (typeof data === "object" && data !== null) {
         const response = data as Record<string, unknown>;
-        const status = parseOnlineStatus(response.status ?? response.online ?? response.isOnline);
-        if (status !== undefined) return status;
+        for (const value of [response.status, response.online, response.isOnline]) {
+            const status = parseOnlineStatus(value);
+            if (status !== undefined) return status;
+        }
+        if (response.data !== undefined) return readOnlineStatus(response.data);
     } else {
         const status = parseOnlineStatus(data);
         if (status !== undefined) return status;
     }
+
 }
 
 function sendRequest<T>(event: string, data: unknown,): Promise<WebSocketMessage<T>> {
