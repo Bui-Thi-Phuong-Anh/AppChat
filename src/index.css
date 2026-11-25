@@ -1127,3 +1127,8 @@ button { color: inherit; }
 .chat-window {
   position: relative;
 }
+
+.chat-item.has-unread .chat-preview {
+  font-weight: 700;
+  color: #202124;
+}
