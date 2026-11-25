@@ -9,7 +9,11 @@ function normalize(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
 }
 
-function DirectoryRows({ entries, isGroup }: { entries: ContactEntry[]; isGroup: boolean }) {
+function DirectoryRows({ entries, isGroup, onSelectContact }: {
+  entries: ContactEntry[];
+  isGroup: boolean;
+  onSelectContact: (entry: ContactEntry, isGroup: boolean) => void;
+}) {
   let previousLetter = "";
 
   if (entries.length === 0) {
@@ -24,7 +28,7 @@ function DirectoryRows({ entries, isGroup }: { entries: ContactEntry[]; isGroup:
 
       return <div key={entry.id}>
         {showLetter && <h3 className="directory-letter">{letter}</h3>}
-        <article className="directory-entry">
+        <button type="button" className="directory-entry" onClick={() => onSelectContact(entry, isGroup)}>
           <span className={`directory-avatar ${isGroup ? "is-group" : ""}`} style={{ backgroundColor: entry.color }}>
             {entry.initials}
             {entry.online && <i className="online-dot" />}
@@ -34,13 +38,15 @@ function DirectoryRows({ entries, isGroup }: { entries: ContactEntry[]; isGroup:
             <span>{entry.detail}</span>
           </span>
           {entry.online && <span className="directory-online-label">Đang hoạt động</span>}
-        </article>
+        </button>
       </div>;
     })}
   </div>;
 }
 
-export function ContactDirectory() {
+export function ContactDirectory({ onSelectContact }: {
+  onSelectContact: (entry: ContactEntry, isGroup: boolean) => void;
+}) {
   const friends = useSelector((state: RootState) => state.contacts.friends);
   const groups = useSelector((state: RootState) => state.contacts.groups);
   const [activeTab, setActiveTab] = useState<DirectoryTab>("friends");
@@ -97,7 +103,7 @@ export function ContactDirectory() {
           </button>
         </div>
       </header>
-      <DirectoryRows entries={filteredEntries} isGroup={!isFriends} />
+      <DirectoryRows entries={filteredEntries} isGroup={!isFriends} onSelectContact={onSelectContact} />
     </section>
   </>;
 }
