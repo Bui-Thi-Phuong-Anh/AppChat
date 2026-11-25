@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector, useStore } from "react-redux";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { ChatList } from "./components/ChatList";
@@ -57,6 +57,10 @@ function formatChatTimestamp(value: string): string {
     return `${daysAgo} ngày trước`;
 }
 
+function normalizeChatId(id: string): string {
+    return id.trim().toLowerCase();
+}
+
 function mapContactToChat(contact: ContactEntry, kind: "people" | "group"): Chat {
     return {
         id: contact.id,
@@ -82,6 +86,8 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     const [searchingUser, setSearchingUser] = useState(false);
     const [theme, setTheme] = useState<"light" | "dark">("light");
 
+    const selectedChatIdRef = useRef<string | null>(selectedChat?.id ?? null);
+
     const friends = useSelector(
         (state: RootState) => state.contacts.friends
     );
@@ -95,6 +101,36 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     const messages = useSelector(
         (state: RootState) => state.messages.messages
     );
+
+    // Số lượng tin nhắn chưa đọc của từng cuộc trò chuyện
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+
+    // Tăng số tin nhắn chưa đọc
+    const increaseUnread = useCallback((chatId: string) => {
+        const key = normalizeChatId(chatId);
+
+        setUnreadCounts((prev) => ({
+            ...prev,
+            [key]: (prev[key] ?? 0) + 1,
+        }));
+    }, []);
+
+    // Đánh dấu cuộc trò chuyện đã đọc
+    const markChatAsRead = (chatId: string) => {
+        const key = normalizeChatId(chatId);
+
+        setUnreadCounts((prev) => ({
+            ...prev,
+            [key]: 0,
+        }));
+    };
+
+    // Chọn cuộc trò chuyện và đánh dấu đã đọc
+    const handleSelectChat = (chat: Chat) => {
+        selectedChatIdRef.current = chat.id;
+        markChatAsRead(chat.id);
+        setSelectedChat(chat);
+    };
 
     // Tải danh sách bạn bè và nhóm từ máy chủ
     const refreshUserList = async () => {
@@ -184,10 +220,17 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                     };
 
                     if (optimistic) {
-                        dispatch(replaceMessage({ id: optimistic.id, message: confirmedMessage }));
+                        dispatch(replaceMessage({
+                            id: optimistic.id,
+                            message: confirmedMessage,
+                        }));
                     } else {
                         dispatch(addMessage(confirmedMessage));
+                        if (!senderIsCurrentUser && normalizeChatId(selectedChatIdRef.current ?? "") !== normalizeChatId(chatId)) {
+                            increaseUnread(chatId);
+                        }
                     }
+
                     return;
                 }
 
@@ -208,23 +251,28 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
 
                 const createdAt = data.createAt ?? new Date().toISOString();
 
-                dispatch(addMessage({id: String(data.id ?? crypto.randomUUID()),
-                        chatId,
-                        senderId: data.name,
-                        senderName: data.name,
-                        recipientId: data.to,
-                        recipientName: data.to,
-                        content: data.mes,
-                        createdAt,
-                        orderAt: createdAt,
-                        type: typeof data.type === "number" ? data.type : 0,
-                    })
-                );
+                dispatch(addMessage({
+                    id: String(data.id ?? crypto.randomUUID()),
+                    chatId,
+                    senderId: data.name,
+                    senderName: data.name,
+                    recipientId: data.to,
+                    recipientName: data.to,
+                    content: data.mes,
+                    createdAt,
+                    orderAt: createdAt,
+                    type: typeof data.type === "number" ? data.type : 0,
+                }));
+
+                // Chỉ tăng khi cuộc trò chuyện chưa được mở.
+                if (normalizeChatId(selectedChatIdRef.current ?? "") !== normalizeChatId(chatId)) {
+                    increaseUnread(chatId);
+                }
             }
         );
 
         return unsubscribe;
-    }, [currentUserId, dispatch, friends, store]);
+    }, [currentUserId, dispatch, friends, store, increaseUnread]);
 
     // Tải lịch sử tin nhắn 1-1 khi danh sách bạn bè được cập nhật
     useEffect(() => {
@@ -333,7 +381,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
 
         const newChat = mapContactToChat(newGroup, "group");
 
-        setSelectedChat(newChat);
+        handleSelectChat(newChat);
         setActiveSection("Tin nhắn");
         setQuery("");
     };
@@ -360,6 +408,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                             : latestMessage.senderId === currentUserId ? "Bạn: " : ""
                         }${latestMessage.content}` : "",
                         time: latestMessage ? formatChatTimestamp(latestMessage.orderAt ?? latestMessage.createdAt) : "",
+                        unreadCount: unreadCounts[normalizeChatId(chat.id)] ?? 0,
                     },
                     latestTimestamp: Number.isNaN(latestTimestamp) ? Number.NEGATIVE_INFINITY : latestTimestamp,
                 };
@@ -371,7 +420,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
             )
             .sort((a, b) => b.latestTimestamp - a.latestTimestamp)
             .map(({ chat }) => chat);
-    }, [chats, messages, currentUserId, query]);
+    }, [chats, messages, currentUserId, query, unreadCounts]);
 
     // Đăng xuất
     const handleLogout = () => {
@@ -487,7 +536,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                 dispatch(setFriends([...currentFriends, newContact]));
             }
 
-            setSelectedChat(chat);
+            handleSelectChat(chat);
             setActiveSection("Tin nhắn");
             setQuery("");
         } catch (error) {
@@ -498,7 +547,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     };
 
     const handleSelectContact = (contact: ContactEntry, isGroup: boolean) => {
-        setSelectedChat(mapContactToChat(contact, isGroup ? "group" : "people"));
+        handleSelectChat(mapContactToChat(contact, isGroup ? "group" : "people"));
         setActiveSection("Tin nhắn");
         setQuery("");
     };
@@ -527,7 +576,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                     <ChatList
                         chats={filteredChats}
                         selectedId={selectedChat?.id}
-                        onSelect={setSelectedChat}
+                        onSelect={handleSelectChat}
                         query={query}
                         onQueryChange={setQuery}
                         onSearchUser={handleSearchUser}
@@ -541,6 +590,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                             currentUserId={currentUserId}
                             onMessageSent={refreshUserList}
                             onRoomLeft={() => {
+                                selectedChatIdRef.current = null;
                                 setSelectedChat(null);
                                 void refreshUserList();
                             }}
