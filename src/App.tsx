@@ -87,6 +87,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     const [theme, setTheme] = useState<"light" | "dark">("light");
 
     const selectedChatIdRef = useRef<string | null>(selectedChat?.id ?? null);
+    const [chatFilter, setChatFilter] = useState<"all" | "unread">("all");
 
     const friends = useSelector(
         (state: RootState) => state.contacts.friends
@@ -103,7 +104,21 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
     );
 
     // Số lượng tin nhắn chưa đọc của từng cuộc trò chuyện
-    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>(() => {
+        try {
+            const saved = localStorage.getItem("chat_unread_counts");
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem(
+            "chat_unread_counts",
+            JSON.stringify(unreadCounts)
+        );
+    }, [unreadCounts]);
 
     // Tăng số tin nhắn chưa đọc
     const increaseUnread = useCallback((chatId: string) => {
@@ -422,6 +437,11 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
             .map(({ chat }) => chat);
     }, [chats, messages, currentUserId, query, unreadCounts]);
 
+    const displayedChats =
+        chatFilter === "unread"
+            ? filteredChats.filter((chat) => (chat.unreadCount ?? 0) > 0)
+            : filteredChats;
+
     // Đăng xuất
     const handleLogout = () => {
         try {
@@ -552,6 +572,11 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
         setQuery("");
     };
 
+    const totalUnread = Object.values(unreadCounts).reduce(
+        (total, count) => total + count,
+        0
+    );
+
     return (
         <main
             className={`app-shell ${
@@ -574,7 +599,7 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
             {activeSection === "Danh bạ" ? (<ContactDirectory onSelectContact={handleSelectContact} />) : (
                 <>
                     <ChatList
-                        chats={filteredChats}
+                        chats={displayedChats}
                         selectedId={selectedChat?.id}
                         onSelect={handleSelectChat}
                         query={query}
@@ -582,6 +607,9 @@ function ChatWorkspace({currentUserId,}: { currentUserId: string; }) {
                         onSearchUser={handleSearchUser}
                         searchingUser={searchingUser}
                         onRoomReady={handleRoomReady}
+                        chatFilter={chatFilter}
+                        onChatFilterChange={setChatFilter}
+                        totalUnread={totalUnread}
                     />
 
                     <section className="conversation-panel" aria-label="Nội dung cuộc trò chuyện">

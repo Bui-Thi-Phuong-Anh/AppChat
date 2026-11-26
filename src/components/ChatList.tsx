@@ -16,6 +16,9 @@ type ChatListProps = {
   onSearchUser: (username: string) => void;
   searchingUser: boolean;
   onRoomReady: (room: Room) => void;
+  chatFilter: "all" | "unread";
+  onChatFilterChange: (filter: "all" | "unread") => void;
+  totalUnread: number;
 };
 
 type SearchResult = {
@@ -24,9 +27,8 @@ type SearchResult = {
   error: string;
 };
 
-export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onSearchUser, searchingUser, onRoomReady,}: ChatListProps) {
+export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onSearchUser, searchingUser, onRoomReady, chatFilter, onChatFilterChange, totalUnread,}: ChatListProps) {  const [checkingKeyword, setCheckingKeyword] = useState("");
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [checkingKeyword, setCheckingKeyword] = useState("");
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [showJoinRoom, setShowJoinRoom] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(false);
@@ -189,9 +191,27 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
             )}
           </label>
 
-          <div className="section-heading">
-            <h2>Tất cả tin nhắn</h2>
-            <span>{filteredChats.length}</span>
+          <div className="chat-filter">
+            <button
+                type="button"
+                className={chatFilter === "all" ? "active" : ""}
+                onClick={() => onChatFilterChange("all")}
+            >
+              Tất cả
+            </button>
+
+            <button
+                type="button"
+                className={chatFilter === "unread" ? "active" : ""}
+                onClick={() => onChatFilterChange("unread")}
+            >
+              Chưa đọc
+              {totalUnread > 0 && (
+                  <span className="chat-filter-count">
+                {totalUnread}
+            </span>
+              )}
+            </button>
           </div>
         </header>
 
@@ -230,7 +250,11 @@ export function ChatList({chats, selectedId, onSelect, query, onQueryChange, onS
 
           {!keyword && filteredChats.length === 0 && (
               <div className="list-empty">
-                <strong>Chưa có cuộc trò chuyện</strong>
+                <strong>
+                  {chatFilter === "unread"
+                      ? "Không có tin nhắn chưa đọc"
+                      : "Chưa có cuộc trò chuyện"}
+                </strong>
               </div>
           )}
         </div>
