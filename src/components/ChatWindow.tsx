@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { leaveRoomThunk } from "../features/rooms/roomsSlice";
+import { fetchRoomMembersThunk, leaveRoomThunk } from "../features/rooms/roomsSlice";
 import type { AppDispatch, RootState } from "../store/store";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import type { Chat } from "../types/chat";
-import {roomService,type RoomMember,} from "../services/roomService";
 
 type ChatWindowProps = {
     chat: Chat | null;
@@ -14,19 +13,36 @@ type ChatWindowProps = {
     onRoomLeft?: () => void;
 };
 
-export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLeft,}: ChatWindowProps) {
+export default function ChatWindow({ chat, currentUserId, onMessageSent, onRoomLeft }: ChatWindowProps) {
     const dispatch = useDispatch<AppDispatch>();
-
-    const leaving = useSelector(
-        (state: RootState) => state.rooms.leaving
-    );
-
-    const roomError = useSelector(
-        (state: RootState) => state.rooms.error
-    );
-
-    const [members, setMembers] = useState<RoomMember[]>([]);
+    const leaving = useSelector((state: RootState) => state.rooms.leaving);
+    const roomError = useSelector((state: RootState) => state.rooms.error);
     const [showMembers, setShowMembers] = useState(false);
+    const membersState = useSelector((state: RootState) =>
+        chat?.kind === "group" ? state.rooms.membersByRoom[chat.name.trim().toLowerCase()] : undefined,
+    );
+    const members = membersState?.members ?? [];
+
+    if (!chat) {
+        return (
+            <main className="chat-window chat-window-empty">
+                <div className="empty-chat">
+                    <div className="empty-chat-icon"></div>
+                    <p>Chưa chọn đoạn chat nào</p>
+                </div>
+            </main>
+        );
+    }
+
+    const isPeopleChat = chat.kind === "people";
+    const toggleMembers = () => {
+        if (showMembers) {
+            setShowMembers(false);
+            return;
+        }
+        setShowMembers(true);
+        if (chat.kind === "group") void dispatch(fetchRoomMembersThunk(chat.name));
+    };
 
     // Rời phòng
     const handleLeaveRoom = async () => {
@@ -45,48 +61,10 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
         );
 
         if (leaveRoomThunk.fulfilled.match(result)) {
-            setMembers([]);
             setShowMembers(false);
             onRoomLeft?.();
         }
     };
-
-    // Lấy danh sách thành viên
-    useEffect(() => {
-        if (!chat || chat.kind !== "group") {
-            return;
-        }
-
-        let cancelled = false;
-
-        roomService.getRoomHistory(chat.name, 1)
-            .then((room) => {
-                if (cancelled) return;
-                setMembers(room.user);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setMembers([]);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [chat]);
-
-    if (!chat) {
-        return (
-            <main className="chat-window chat-window-empty">
-                <div className="empty-chat">
-                    <div className="empty-chat-icon"></div>
-                    <h2>Chào mừng đến với AppChat</h2>
-                    <p>Chưa chọn đoạn chat nào</p>
-                </div>
-            </main>
-        );
-    }
-
-    const isPeopleChat = chat.kind === "people";
 
     return (
         <main className="chat-window">
@@ -99,17 +77,22 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
                 <div className="chat-header-info">
                     <h2>{chat.name}</h2>
                     <span>
-                        {isPeopleChat ? chat.online === undefined ? "Đang kiểm tra trạng thái..." : chat.online ? "Đang hoạt động" : "Ngoại tuyến" : `Phòng chat`}
+                        {isPeopleChat
+                            ? chat.online === undefined
+                                ? "Đang kiểm tra trạng thái..."
+                                : chat.online
+                                    ? "Đang hoạt động"
+                                    : "Ngoại tuyến"
+                            : "Phòng chat"}
                     </span>
                 </div>
 
                 {chat.kind === "group" && (
                     <div className="chat-header-actions">
-                        <button type="button" className="show-members-button" onClick={() => setShowMembers((prev) => !prev)}>
-                            <i className="bi bi-people"></i>
+                        <button type="button" className="show-members-button" onClick={toggleMembers} aria-expanded={showMembers}>
+                            <i className="bi bi-people" aria-hidden="true"></i>
                             Thành viên ({members.length})
                         </button>
-
                         <button type="button" className="leave-room-header-button" onClick={handleLeaveRoom} disabled={leaving}>
                             {leaving ? "Đang rời..." : "Rời phòng"}
                         </button>
@@ -118,51 +101,55 @@ export default function ChatWindow({chat, currentUserId, onMessageSent, onRoomLe
             </header>
 
             {chat.kind === "group" && roomError && (
-                <div className="room-error-message" role="alert">
-                    {roomError}
-                </div>
+                <div className="room-error-message" role="alert">{roomError}</div>
             )}
 
-            {chat.kind === "group" && showMembers && (
-                <div className="room-members-panel">
-                    <div className="room-members-panel-header">
-                        <h3>Thành viên ({members.length})</h3>
+            <div className="chat-content">
+                <div className="chat-main">
+                    <MessageList
+                        chatId={chat.id}
+                        currentUserId={currentUserId}
+                        username={chat.name}
+                        isPeopleChat={isPeopleChat}
+                        isRoomChat={chat.kind === "group"}
+                    />
+                    <MessageInput
+                        chatId={chat.id}
+                        currentUserId={currentUserId}
+                        isPeopleChat={isPeopleChat}
+                        onMessageSent={onMessageSent}
+                    />
+                </div>
 
-                        <button type="button" onClick={() => setShowMembers(false)}>
-                            x
-                        </button>
-                    </div>
+                {chat.kind === "group" && showMembers && (
+                    <aside className="room-members-panel" aria-label={`Thành viên nhóm ${chat.name}`}>
+                        <div className="room-members-panel-header">
+                            <h3>Thành viên ({members.length})</h3>
+                            <button type="button" onClick={() => setShowMembers(false)} aria-label="Đóng danh sách thành viên">×</button>
+                        </div>
 
-                    {members.length > 0 ? (
-                        members.map((member) => (
-                            <div className="room-member-item" key={member.id}>
-                                <div className="room-member-avatar">
-                                    {member.name.charAt(0).toUpperCase()}
-                                </div>
-
-                                <span>{member.name}</span>
+                        {membersState?.loading ? (
+                            <p className="room-members-status">Đang tải thành viên...</p>
+                        ) : membersState?.error ? (
+                            <div className="room-members-status" role="alert">
+                                <p>{membersState.error}</p>
+                                <button type="button" onClick={() => void dispatch(fetchRoomMembersThunk(chat.name))}>Thử lại</button>
                             </div>
-                        ))
-                    ) : (
-                        <p>Chưa có thông tin thành viên.</p>
-                    )}
-                </div>
-            )}
-
-            <MessageList
-                chatId={chat.id}
-                currentUserId={currentUserId}
-                username={chat.name}
-                isPeopleChat={isPeopleChat}
-                isRoomChat={chat.kind === "group"}
-            />
-
-            <MessageInput
-                chatId={chat.id}
-                currentUserId={currentUserId}
-                isPeopleChat={isPeopleChat}
-                onMessageSent={onMessageSent}
-            />
+                        ) : members.length > 0 ? (
+                            members.map((member) => (
+                                <div className="room-member-item" key={`${member.id}-${member.name}`}>
+                                    <span className="chat-avatar room-member-avatar" style={{ backgroundColor: "#989bff" }} aria-hidden="true">
+                                        {member.name.trim().slice(0, 2).toUpperCase()}
+                                    </span>
+                                    <span className="room-member-name">{member.name}</span>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="room-members-status">Nhóm chưa có thành viên.</p>
+                        )}
+                    </aside>
+                )}
+            </div>
         </main>
     );
 }
