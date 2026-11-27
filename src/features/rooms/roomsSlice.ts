@@ -1,9 +1,10 @@
 import {createAsyncThunk, createSlice, type PayloadAction,} from "@reduxjs/toolkit";
-import type { Room } from "../../services/roomService";
+import type { Room, RoomMember } from "../../services/roomService";
 import { roomService } from "../../services/roomService";
 
 interface RoomsState {
     rooms: Room[];
+    membersByRoom: Record<string, RoomMembersState>;
     loading: boolean;
     creating: boolean;
     joining: boolean;
@@ -12,8 +13,15 @@ interface RoomsState {
     selectedRoomId: string | null;
 }
 
+interface RoomMembersState {
+    members: RoomMember[];
+    loading: boolean;
+    error: string | null;
+}
+
 const initialState: RoomsState = {
     rooms: [],
+    membersByRoom: {},
     loading: false,
     creating: false,
     joining: false,
@@ -25,6 +33,33 @@ const initialState: RoomsState = {
 type ThunkConfig = {
     rejectValue: string;
 };
+
+const roomKey = (name: string) => name.trim().toLowerCase();
+
+function setRoomMembers(state: RoomsState, name: string, members: RoomMember[]) {
+    state.membersByRoom[roomKey(name)] = { members, loading: false, error: null };
+}
+
+export const fetchRoomMembersThunk = createAsyncThunk<RoomMember[], string, ThunkConfig>(
+    "rooms/fetchMembers",
+    async (name, { rejectWithValue }) => {
+        try {
+            const roomName = name.trim();
+            if (!roomName) return rejectWithValue("Chưa chọn phòng chat.");
+            const room = await roomService.getRoomHistory(roomName, 1);
+            return room.user;
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "Không tải được danh sách thành viên.");
+        }
+    },
+    {
+        condition: (name, { getState }) => {
+            const state = getState() as { rooms: RoomsState };
+            const cached = state.rooms.membersByRoom[roomKey(name)];
+            return !cached?.loading && (!cached || cached.error !== null);
+        },
+    },
+);
 
 // Tạo phòng
 export const createRoomThunk = createAsyncThunk<Room, string, ThunkConfig>(
@@ -92,6 +127,7 @@ function saveRoom(state: RoomsState, room: Room) {
         state.rooms.push(room);
     }
 
+    setRoomMembers(state, room.name, room.user);
     state.selectedRoomId = room.name;
 }
 
@@ -110,13 +146,12 @@ const roomsSlice = createSlice({
 
         updateRoomDetails(state, action: PayloadAction<Room>) {
             const index = state.rooms.findIndex(
-                (room) => room.name.toLowerCase() === action.payload.name.toLowerCase(),
+                (room) => roomKey(room.name) === roomKey(action.payload.name),
             );
-            if (index >= 0) {
-                state.rooms[index] = { ...state.rooms[index], ...action.payload };
-            } else {
-                state.rooms.push(action.payload);
-            }
+            if (index >= 0) state.rooms[index] = { ...state.rooms[index], ...action.payload };
+            else state.rooms.push(action.payload);
+
+            setRoomMembers(state, action.payload.name, action.payload.user);
         },
 
         setSelectedRoomId(state, action: PayloadAction<string | null>) {
@@ -129,6 +164,7 @@ const roomsSlice = createSlice({
 
         clearRooms(state) {
             state.rooms = [];
+            state.membersByRoom = {};
             state.selectedRoomId = null;
             state.error = null;
             state.loading = false;
@@ -187,6 +223,21 @@ const roomsSlice = createSlice({
             .addCase(leaveRoomThunk.rejected, (state, action) => {
                 state.leaving = false;
                 state.error = action.payload ?? "Không thể rời phòng.";
+            })
+            .addCase(fetchRoomMembersThunk.pending, (state, action) => {
+                const key = roomKey(action.meta.arg);
+                state.membersByRoom[key] ??= { members: [], loading: false, error: null };
+                state.membersByRoom[key].loading = true;
+                state.membersByRoom[key].error = null;
+            })
+            .addCase(fetchRoomMembersThunk.fulfilled, (state, action) => {
+                setRoomMembers(state, action.meta.arg, action.payload);
+            })
+            .addCase(fetchRoomMembersThunk.rejected, (state, action) => {
+                const key = roomKey(action.meta.arg);
+                state.membersByRoom[key] ??= { members: [], loading: false, error: null };
+                state.membersByRoom[key].loading = false;
+                state.membersByRoom[key].error = action.payload ?? "Không tải được danh sách thành viên.";
             });
     },
 });

@@ -137,6 +137,13 @@
 .theme-dark .contact-option-icon { background: #1f2937; color: #9ca3af; }
 .theme-dark .contact-option-count, .theme-dark .directory-total { background: #312e81; color: #c7d2fe; }
 .theme-dark .directory-header, .theme-dark .directory-entry, .theme-dark .user-profile, .theme-dark .chat-window-header, .theme-dark .message-input-container { border-color: #273449; }
+.theme-dark .room-members-panel { border-color: #273449; background: #111827; }
+.theme-dark .room-members-panel-header { border-color: #273449; }
+.theme-dark .room-members-panel-header h3, .theme-dark .room-member-name { color: #e5e7eb; }
+.theme-dark .room-member-item:hover { background: #1f2937; }
+.theme-dark .room-member-avatar { color: #334155; }
+.theme-dark .room-members-status { color: #9ca3af; }
+.theme-dark .room-members-panel-header button { background: #1f2937; color: #d1d5db; }
 .theme-dark .directory-toolbar, .theme-dark .directory-letter, .theme-dark .section-heading span { color: #9ca3af; }
 .theme-dark .directory-sort { border-color: #374151; background: #1f2937; color: #d1d5db; }
 .theme-dark .directory-avatar { color: #1f2937; }
